@@ -18,24 +18,28 @@ const defaultData = {
 let data = loadData();
 
 function loadData() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-
-    if (!saved) {
-        return structuredClone(defaultData);
-    }
-
     try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+
+        if (!saved) {
+            return structuredClone(defaultData);
+        }
+
         const parsed = JSON.parse(saved);
 
         return {
-            ...defaultData,
+            ...structuredClone(defaultData),
             ...parsed,
+            purchases: Array.isArray(parsed.purchases) ? parsed.purchases : [],
+            sales: Array.isArray(parsed.sales) ? parsed.sales : [],
+            adjustments: Array.isArray(parsed.adjustments) ? parsed.adjustments : [],
             settings: {
                 ...defaultData.settings,
                 ...(parsed.settings || {})
             }
         };
-    } catch {
+    } catch (error) {
+        console.error("Failed to load Tracker data:", error);
         return structuredClone(defaultData);
     }
 }
@@ -44,29 +48,23 @@ function saveData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-function generateId(prefix) {
-    return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+function generateId(prefix = "item") {
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function formatCurrency(value) {
-    return `Rs. ${Number(value || 0).toLocaleString("en-IN", {
+    const number = Number(value) || 0;
+
+    return `Rs. ${number.toLocaleString("en-IN", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     })}`;
 }
 
 function formatNumber(value) {
-    return Number(value || 0).toLocaleString("en-IN");
-}
-
-function formatDate(date) {
-    if (!date) return "-";
-
-    const d = new Date(date);
-
-    if (Number.isNaN(d.getTime())) return date;
-
-    return d.toLocaleDateString("en-GB");
+    return (Number(value) || 0).toLocaleString("en-IN", {
+        maximumFractionDigits: 2
+    });
 }
 
 function getToday() {
@@ -78,75 +76,283 @@ function getToday() {
     return `${year}-${month}-${day}`;
 }
 
+function formatDate(dateValue) {
+    if (!dateValue) {
+        return "-";
+    }
+
+    const date = new Date(`${dateValue}T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+        return dateValue;
+    }
+
+    return date.toLocaleDateString("en-IN", {
+        year: "numeric",
+        month: "short",
+        day: "numeric"
+    });
+}
+
+function isSameDate(dateA, dateB) {
+    return dateA === dateB;
+}
+
+function getAllInventoryEvents() {
+    const purchases = data.purchases.map(item => ({
+        type: "purchase",
+        date: item.date,
+        createdAt: item.createdAt || 0,
+        id: item.id,
+        quantity: Number(item.quantity) || 0,
+        unitPrice: Number(item.unitPrice) || 0,
+        item
+    }));
+
+    const sales = data.sales.map(item => ({
+        type: "sale",
+        date: item.date,
+        createdAt: item.createdAt || 0,
+        id: item.id,
+        quantity: Number(item.quantity) || 0,
+        unitPrice: Number(item.unitPrice) || 0,
+        item
+    }));
+
+    const adjustments = data.adjustments.map(item => ({
+        type: "adjustment",
+        date: item.date,
+        createdAt: item.createdAt || 0,
+        id: item.id,
+        quantity: Number(item.quantity) || 0,
+        unitPrice: 0,
+        item
+    }));
+
+    return [...purchases, ...sales, ...adjustments].sort((a, b) => {
+        const dateCompare = String(a.date).localeCompare(String(b.date));
+
+        if (dateCompare !== 0) {
+            return dateCompare;
+        }
+
+        return Number(a.createdAt) - Number(b.createdAt);
+    });
+}
+
+function getInventoryState(untilDate = null) {
+    let quantity = Number(data.openingStock) || 0;
+    let value = quantity * (Number(data.settings.purchasePrice) || 0);
+
+    const events = getAllInventoryEvents();
+
+    for (const event of events) {
+        if (untilDate && event.date > untilDate) {
+            continue;
+        }
+
+        if (event.type === "purchase") {
+            quantity += event.quantity;
+            value += event.quantity * event.unitPrice;
+        }
+
+        if (event.type === "sale") {
+            if (quantity > 0) {
+                const averageCost = value / quantity;
+                value -= Math.min(event.quantity, quantity) * averageCost;
+            }
+
+            quantity -= event.quantity;
+
+            if (quantity < 0) {
+                quantity = 0;
+            }
+
+            if (value < 0) {
+                value = 0;
+            }
+        }
+
+        if (event.type === "adjustment") {
+            if (event.quantity > 0) {
+                const averageCost = quantity > 0
+                    ? value / quantity
+                    : Number(data.settings.purchasePrice) || 0;
+
+                quantity += event.quantity;
+                value += event.quantity * averageCost;
+            } else if (event.quantity < 0) {
+                const removeQuantity = Math.min(
+                    Math.abs(event.quantity),
+                    quantity
+                );
+
+                const averageCost = quantity > 0
+                    ? value / quantity
+                    : 0;
+
+                quantity -= removeQuantity;
+                value -= removeQuantity * averageCost;
+
+                if (quantity < 0) {
+                    quantity = 0;
+                }
+
+                if (value < 0) {
+                    value = 0;
+                }
+            }
+        }
+    }
+
+    return {
+        quantity,
+        value,
+        averageCost: quantity > 0 ? value / quantity : 0
+    };
+}
+
 function getCurrentStock() {
-    const purchases = data.purchases.reduce(
-        (total, item) => total + Number(item.quantity),
-        0
-    );
+    return getInventoryState().quantity;
+}
 
-    const sales = data.sales.reduce(
-        (total, item) => total + Number(item.quantity),
-        0
-    );
+function getStockValue() {
+    return getInventoryState().value;
+}
 
-    const adjustments = data.adjustments.reduce(
-        (total, item) => total + Number(item.quantity),
-        0
-    );
-
-    return Number(data.openingStock) + purchases - sales + adjustments;
+function getAveragePurchasePrice() {
+    return getInventoryState().averageCost;
 }
 
 function getTotalPurchase() {
     return data.purchases.reduce(
-        (total, item) => total + Number(item.totalAmount),
+        (total, item) => total + (Number(item.totalAmount) || 0),
         0
     );
 }
 
 function getTotalSales() {
     return data.sales.reduce(
-        (total, item) => total + Number(item.totalAmount),
+        (total, item) => total + (Number(item.totalAmount) || 0),
         0
     );
 }
 
 function getTotalItemsPurchased() {
     return data.purchases.reduce(
-        (total, item) => total + Number(item.quantity),
+        (total, item) => total + (Number(item.quantity) || 0),
         0
     );
 }
 
 function getTotalItemsSold() {
     return data.sales.reduce(
-        (total, item) => total + Number(item.quantity),
+        (total, item) => total + (Number(item.quantity) || 0),
         0
     );
 }
 
-function getAveragePurchasePrice() {
-    const quantity = getTotalItemsPurchased();
+function getSaleCost(saleId) {
+    let quantity = Number(data.openingStock) || 0;
+    let value = quantity * (Number(data.settings.purchasePrice) || 0);
+    let saleCost = 0;
 
-    if (quantity <= 0) {
-        return Number(data.settings.purchasePrice) || 0;
+    const events = getAllInventoryEvents();
+
+    for (const event of events) {
+        if (event.type === "purchase") {
+            quantity += event.quantity;
+            value += event.quantity * event.unitPrice;
+        }
+
+        if (event.type === "sale") {
+            if (quantity > 0) {
+                const averageCost = value / quantity;
+                const cost = event.quantity * averageCost;
+
+                if (event.id === saleId) {
+                    return cost;
+                }
+
+                saleCost += cost;
+                value -= Math.min(event.quantity, quantity) * averageCost;
+            }
+
+            quantity -= event.quantity;
+
+            if (quantity < 0) {
+                quantity = 0;
+            }
+
+            if (value < 0) {
+                value = 0;
+            }
+        }
+
+        if (event.type === "adjustment") {
+            if (event.quantity > 0) {
+                const averageCost = quantity > 0
+                    ? value / quantity
+                    : Number(data.settings.purchasePrice) || 0;
+
+                quantity += event.quantity;
+                value += event.quantity * averageCost;
+            } else if (event.quantity < 0) {
+                const removeQuantity = Math.min(
+                    Math.abs(event.quantity),
+                    quantity
+                );
+
+                const averageCost = quantity > 0
+                    ? value / quantity
+                    : 0;
+
+                quantity -= removeQuantity;
+                value -= removeQuantity * averageCost;
+
+                if (quantity < 0) {
+                    quantity = 0;
+                }
+
+                if (value < 0) {
+                    value = 0;
+                }
+            }
+        }
     }
 
-    return getTotalPurchase() / quantity;
-}
-
-function getTotalCostOfSoldItems() {
-    return data.sales.reduce((total, sale) => {
-        return total + Number(sale.costAmount || 0);
-    }, 0);
+    return saleCost;
 }
 
 function getTotalProfit() {
-    return getTotalSales() - getTotalCostOfSoldItems();
+    return data.sales.reduce((total, sale) => {
+        const revenue = Number(sale.totalAmount) || 0;
+        const cost = getSaleCost(sale.id);
+
+        return total + revenue - cost;
+    }, 0);
 }
 
-function getStockValue() {
-    return getCurrentStock() * getAveragePurchasePrice();
+function getTodaySales() {
+    const today = getToday();
+
+    return data.sales
+        .filter(item => isSameDate(item.date, today))
+        .reduce(
+            (total, item) => total + (Number(item.totalAmount) || 0),
+            0
+        );
+}
+
+function getTodayPurchase() {
+    const today = getToday();
+
+    return data.purchases
+        .filter(item => isSameDate(item.date, today))
+        .reduce(
+            (total, item) => total + (Number(item.totalAmount) || 0),
+            0
+        );
 }
 
 function setText(id, value) {
@@ -160,49 +366,60 @@ function setText(id, value) {
 function initializeDates() {
     const today = getToday();
 
-    const dateInputs = [
+    const dateFields = [
         "stockDate",
         "saleDate"
     ];
 
-    dateInputs.forEach(id => {
-        const input = document.getElementById(id);
+    dateFields.forEach(id => {
+        const field = document.getElementById(id);
 
-        if (input && !input.value) {
-            input.value = today;
+        if (field && !field.value) {
+            field.value = today;
         }
     });
 
-    const fromInputs = [
-        "purchaseFromDate",
-        "salesFromDate",
-        "reportFromDate"
-    ];
+    const purchaseFromDate = document.getElementById("purchaseFromDate");
+    const purchaseToDate = document.getElementById("purchaseToDate");
 
-    fromInputs.forEach(id => {
-        const input = document.getElementById(id);
+    if (purchaseToDate && !purchaseToDate.value) {
+        purchaseToDate.value = today;
+    }
 
-        if (input && !input.value) {
-            const date = new Date();
-            date.setDate(date.getDate() - 30);
+    if (purchaseFromDate && !purchaseFromDate.value) {
+        const date = new Date();
+        date.setDate(date.getDate() - 30);
 
-            input.value = date.toISOString().split("T")[0];
-        }
-    });
+        purchaseFromDate.value = date.toISOString().split("T")[0];
+    }
 
-    const toInputs = [
-        "purchaseToDate",
-        "salesToDate",
-        "reportToDate"
-    ];
+    const salesFromDate = document.getElementById("salesFromDate");
+    const salesToDate = document.getElementById("salesToDate");
 
-    toInputs.forEach(id => {
-        const input = document.getElementById(id);
+    if (salesToDate && !salesToDate.value) {
+        salesToDate.value = today;
+    }
 
-        if (input && !input.value) {
-            input.value = today;
-        }
-    });
+    if (salesFromDate && !salesFromDate.value) {
+        const date = new Date();
+        date.setDate(date.getDate() - 30);
+
+        salesFromDate.value = date.toISOString().split("T")[0];
+    }
+
+    const reportToDate = document.getElementById("reportToDate");
+    const reportFromDate = document.getElementById("reportFromDate");
+
+    if (reportToDate && !reportToDate.value) {
+        reportToDate.value = today;
+    }
+
+    if (reportFromDate && !reportFromDate.value) {
+        const date = new Date();
+        date.setDate(date.getDate() - 30);
+
+        reportFromDate.value = date.toISOString().split("T")[0];
+    }
 }
 
 function updateDashboard() {
@@ -216,20 +433,18 @@ function updateDashboard() {
     setText("totalSales", formatCurrency(totalSales));
     setText("totalProfit", formatCurrency(totalProfit));
 
-    const today = getToday();
+    setText("todaySales", formatCurrency(getTodaySales()));
+    setText("todayPurchase", formatCurrency(getTodayPurchase()));
 
-    const todaySales = data.sales
-        .filter(item => item.date === today)
-        .reduce((total, item) => total + Number(item.totalAmount), 0);
+    setText(
+        "totalItemsPurchased",
+        formatNumber(getTotalItemsPurchased())
+    );
 
-    const todayPurchase = data.purchases
-        .filter(item => item.date === today)
-        .reduce((total, item) => total + Number(item.totalAmount), 0);
-
-    setText("todaySales", formatCurrency(todaySales));
-    setText("todayPurchase", formatCurrency(todayPurchase));
-    setText("totalItemsPurchased", formatNumber(getTotalItemsPurchased()));
-    setText("totalItemsSold", formatNumber(getTotalItemsSold()));
+    setText(
+        "totalItemsSold",
+        formatNumber(getTotalItemsSold())
+    );
 
     setText("openingStock", formatNumber(data.openingStock));
     setText(
@@ -245,230 +460,260 @@ function updateDashboard() {
         formatNumber(currentStock)
     );
 
+    const currentDate = document.getElementById("currentDate");
+
+    if (currentDate) {
+        currentDate.textContent = formatDate(getToday());
+    }
+
     updateLowStockAlert();
-    updateRecentActivity();
-   function updateSalesChart() {
-    const chart = document.getElementById("salesChart");
+    updateSalesChart();
+    renderRecentActivity();
+}
 
-    if (!chart) return;
+function updateLowStockAlert() {
+    const alertBox = document.getElementById("lowStockAlert");
 
-    const today = new Date();
+    if (!alertBox) {
+        return;
+    }
+
+    const currentStock = getCurrentStock();
+    const limit = Number(data.settings.lowStockLimit) || 0;
+
+    if (currentStock <= limit) {
+        alertBox.classList.remove("hidden");
+
+        alertBox.innerHTML = `
+            <strong>Low Stock</strong>
+            <span>Current stock is ${formatNumber(currentStock)} pieces. Your low stock limit is ${formatNumber(limit)} pieces.</span>
+        `;
+    } else {
+        alertBox.classList.add("hidden");
+        alertBox.innerHTML = "";
+    }
+}
+
+function getLastSevenDays() {
     const days = [];
 
     for (let i = 6; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - i);
+        const date = new Date();
+        date.setDate(date.getDate() - i);
 
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, "0");
         const day = String(date.getDate()).padStart(2, "0");
 
-        const dateString = `${year}-${month}-${day}`;
-
-        const sales = data.sales
-            .filter(item => item.date === dateString)
-            .reduce(
-                (total, item) => total + Number(item.totalAmount),
-                0
-            );
-
         days.push({
-            date: dateString,
-            sales
+            date: `${year}-${month}-${day}`,
+            label: date.toLocaleDateString("en-IN", {
+                weekday: "short"
+            })
         });
     }
 
-    const maxSales = Math.max(
-        ...days.map(item => item.sales),
-        1
-    );
+    return days;
+}
+
+function updateSalesChart() {
+    const chart = document.getElementById("salesChart");
+
+    if (!chart) {
+        return;
+    }
+
+    const days = getLastSevenDays();
+
+    const values = days.map(day => {
+        return data.sales
+            .filter(sale => sale.date === day.date)
+            .reduce(
+                (total, sale) =>
+                    total + (Number(sale.totalAmount) || 0),
+                0
+            );
+    });
+
+    const maxValue = Math.max(...values, 1);
 
     chart.innerHTML = `
-        <div class="sales-chart">
-            ${days.map(item => {
+        <div class="chart-bars">
+            ${values.map((value, index) => {
                 const height = Math.max(
-                    (item.sales / maxSales) * 100,
-                    item.sales > 0 ? 5 : 0
+                    5,
+                    (value / maxValue) * 100
                 );
-
-                const date = new Date(item.date);
-
-                const label = date.toLocaleDateString("en-US", {
-                    weekday: "short"
-                });
 
                 return `
                     <div class="chart-column">
-                        <div class="chart-value">
-                            ${item.sales > 0 ? formatCurrency(item.sales) : ""}
-                        </div>
-
-                        <div class="chart-bar-area">
-                            <div
-                                class="chart-bar"
-                                style="height: ${height}%"
-                                title="${formatCurrency(item.sales)}"
-                            ></div>
-                        </div>
-
-                        <div class="chart-label">
-                            ${label}
-                        </div>
+                        <div class="chart-value">${formatCurrency(value)}</div>
+                        <div class="chart-bar" style="height:${height}%"></div>
+                        <div class="chart-label">${days[index].label}</div>
                     </div>
                 `;
             }).join("")}
         </div>
     `;
 }
-}
 
-function updateLowStockAlert() {
-    const alert = document.getElementById("lowStockAlert");
-
-    if (!alert) return;
-
-    const stock = getCurrentStock();
-    const limit = Number(data.settings.lowStockLimit) || 0;
-
-    if (stock <= limit) {
-        alert.classList.add("show");
-
-        const message = alert.querySelector("[data-low-stock-message]");
-
-        if (message) {
-            message.textContent = `Current stock is ${formatNumber(stock)} pieces. Low stock limit is ${formatNumber(limit)} pieces.`;
-        } else {
-            alert.innerHTML = `
-                <strong>Low Stock Alert</strong>
-                <span>Current stock is ${formatNumber(stock)} pieces. Low stock limit is ${formatNumber(limit)} pieces.</span>
-            `;
-        }
-    } else {
-        alert.classList.remove("show");
-    }
-}
-
-function updateRecentActivity() {
-    const table = document.getElementById("recentActivity");
-
-    if (!table) return;
-
+function getActivityList() {
     const activities = [];
 
     data.purchases.forEach(item => {
         activities.push({
             date: item.date,
+            createdAt: item.createdAt || 0,
             type: "Stock In",
-            quantity: Number(item.quantity),
-            amount: Number(item.totalAmount),
-            reference: item.reference || "-"
+            description: `Purchased ${formatNumber(item.quantity)} pieces`,
+            amount: Number(item.totalAmount) || 0
         });
     });
 
     data.sales.forEach(item => {
         activities.push({
             date: item.date,
+            createdAt: item.createdAt || 0,
             type: "Sale",
-            quantity: Number(item.quantity),
-            amount: Number(item.totalAmount),
-            reference: item.reference || "-"
+            description: `Sold ${formatNumber(item.quantity)} pieces`,
+            amount: Number(item.totalAmount) || 0
         });
     });
 
     data.adjustments.forEach(item => {
         activities.push({
             date: item.date,
+            createdAt: item.createdAt || 0,
             type: "Adjustment",
-            quantity: Number(item.quantity),
-            amount: 0,
-            reference: item.reason || "-"
+            description: `${item.quantity >= 0 ? "Added" : "Removed"} ${formatNumber(Math.abs(item.quantity))} pieces`,
+            amount: 0
         });
     });
 
-    activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return activities.sort((a, b) => {
+        const dateCompare = String(b.date).localeCompare(String(a.date));
 
-    const latest = activities.slice(0, 8);
+        if (dateCompare !== 0) {
+            return dateCompare;
+        }
 
-    if (!latest.length) {
-        table.innerHTML = `
-            <tr>
-                <td colspan="5">No activity yet.</td>
-            </tr>
-        `;
+        return Number(b.createdAt) - Number(a.createdAt);
+    });
+}
+
+function renderRecentActivity() {
+    const container = document.getElementById("recentActivity");
+
+    if (!container) {
         return;
     }
 
-    table.innerHTML = latest.map(item => {
-        const quantity = item.quantity > 0
-            ? `+${formatNumber(item.quantity)}`
-            : formatNumber(item.quantity);
+    const activities = getActivityList().slice(0, 8);
 
-        return `
+    if (!activities.length) {
+        container.innerHTML = `
             <tr>
-                <td>${formatDate(item.date)}</td>
-                <td>${item.type}</td>
-                <td>${quantity}</td>
-                <td>${item.amount ? formatCurrency(item.amount) : "-"}</td>
-                <td>${item.reference}</td>
+                <td colspan="4">No recent activity</td>
             </tr>
         `;
-    }).join("");
-}
 
-function updateStockPage() {
-    const stock = getCurrentStock();
-    const purchaseValue = getStockValue();
-    const salesValue = stock * (Number(data.settings.sellingPrice) || 0);
-    const potentialProfit = salesValue - purchaseValue;
-
-    setText("stockPageQuantity", formatNumber(stock));
-    setText("stockPurchaseValue", formatCurrency(purchaseValue));
-    setText("stockSalesValue", formatCurrency(salesValue));
-    setText("potentialProfit", formatCurrency(potentialProfit));
-
-    setText("detailCurrentStock", formatNumber(stock));
-    setText(
-        "detailPurchasePrice",
-        formatCurrency(getAveragePurchasePrice())
-    );
-    setText(
-        "detailSellingPrice",
-        formatCurrency(data.settings.sellingPrice)
-    );
-    setText(
-        "detailLowStock",
-        formatNumber(data.settings.lowStockLimit)
-    );
-    setText("detailStockValue", formatCurrency(purchaseValue));
-
-    const status = document.getElementById("stockStatus");
-
-    if (status) {
-        if (stock <= Number(data.settings.lowStockLimit)) {
-            status.textContent = "Low Stock";
-            status.className = "stock-status danger";
-        } else {
-            status.textContent = "In Stock";
-            status.className = "stock-status success";
-        }
+        return;
     }
 
-    updateStockMovementTable();
+    container.innerHTML = activities.map(activity => `
+        <tr>
+            <td>${formatDate(activity.date)}</td>
+            <td>${activity.type}</td>
+            <td>${activity.description}</td>
+            <td>${activity.amount ? formatCurrency(activity.amount) : "-"}</td>
+        </tr>
+    `).join("");
+}
+function renderStockPage() {
+    const currentStock = getCurrentStock();
+    const stockValue = getStockValue();
+    const averageCost = getAveragePurchasePrice();
+    const sellingPrice = Number(data.settings.sellingPrice) || 0;
+    const potentialProfit = (sellingPrice - averageCost) * currentStock;
+
+    setText("stockPageQuantity", formatNumber(currentStock));
+    setText("stockPurchaseValue", formatCurrency(stockValue));
+    setText(
+        "stockSalesValue",
+        formatCurrency(currentStock * sellingPrice)
+    );
+    setText(
+        "potentialProfit",
+        formatCurrency(potentialProfit)
+    );
+
+    setText(
+        "detailCurrentStock",
+        `${formatNumber(currentStock)} pieces`
+    );
+
+    setText(
+        "detailPurchasePrice",
+        formatCurrency(averageCost)
+    );
+
+    setText(
+        "detailSellingPrice",
+        formatCurrency(sellingPrice)
+    );
+
+    setText(
+        "detailLowStock",
+        `${formatNumber(data.settings.lowStockLimit)} pieces`
+    );
+
+    setText(
+        "detailStockValue",
+        formatCurrency(stockValue)
+    );
+
+    updateStockStatus();
+    renderStockMovements();
 }
 
-function updateStockMovementTable() {
+function updateStockStatus() {
+    const status = document.getElementById("stockStatus");
+
+    if (!status) {
+        return;
+    }
+
+    const stock = getCurrentStock();
+    const limit = Number(data.settings.lowStockLimit) || 0;
+
+    if (stock <= 0) {
+        status.textContent = "Out of Stock";
+        status.className = "stock-status danger";
+    } else if (stock <= limit) {
+        status.textContent = "Low Stock";
+        status.className = "stock-status warning";
+    } else {
+        status.textContent = "In Stock";
+        status.className = "stock-status success";
+    }
+}
+
+function renderStockMovements() {
     const table = document.getElementById("stockMovementTable");
 
-    if (!table) return;
+    if (!table) {
+        return;
+    }
 
     const movements = [];
 
     data.purchases.forEach(item => {
         movements.push({
             date: item.date,
+            createdAt: item.createdAt || 0,
             type: "Stock In",
-            quantity: `+${item.quantity}`,
-            reference: item.reference || "-",
+            quantity: Number(item.quantity) || 0,
+            reference: item.reference || item.supplier || "-",
             notes: item.notes || "-"
         });
     });
@@ -476,8 +721,9 @@ function updateStockMovementTable() {
     data.sales.forEach(item => {
         movements.push({
             date: item.date,
+            createdAt: item.createdAt || 0,
             type: "Sale",
-            quantity: `-${item.quantity}`,
+            quantity: -(Number(item.quantity) || 0),
             reference: item.reference || "-",
             notes: item.notes || "-"
         });
@@ -486,23 +732,31 @@ function updateStockMovementTable() {
     data.adjustments.forEach(item => {
         movements.push({
             date: item.date,
+            createdAt: item.createdAt || 0,
             type: "Adjustment",
-            quantity: item.quantity > 0
-                ? `+${item.quantity}`
-                : item.quantity,
+            quantity: Number(item.quantity) || 0,
             reference: item.reason || "-",
             notes: item.notes || "-"
         });
     });
 
-    movements.sort((a, b) => new Date(b.date) - new Date(a.date));
+    movements.sort((a, b) => {
+        const dateCompare = String(b.date).localeCompare(String(a.date));
+
+        if (dateCompare !== 0) {
+            return dateCompare;
+        }
+
+        return Number(b.createdAt) - Number(a.createdAt);
+    });
 
     if (!movements.length) {
         table.innerHTML = `
             <tr>
-                <td colspan="5">No stock movements yet.</td>
+                <td colspan="5">No stock movement found</td>
             </tr>
         `;
+
         return;
     }
 
@@ -510,53 +764,88 @@ function updateStockMovementTable() {
         <tr>
             <td>${formatDate(item.date)}</td>
             <td>${item.type}</td>
-            <td>${formatNumber(item.quantity)}</td>
+            <td class="${item.quantity >= 0 ? "text-success" : "text-danger"}">
+                ${item.quantity >= 0 ? "+" : ""}${formatNumber(item.quantity)}
+            </td>
             <td>${item.reference}</td>
             <td>${item.notes}</td>
         </tr>
     `).join("");
 }
 
-function updatePurchasePage() {
+function renderPurchasePage() {
+    const purchases = getFilteredPurchases();
+
+    const totalQuantity = purchases.reduce(
+        (total, item) =>
+            total + (Number(item.quantity) || 0),
+        0
+    );
+
+    const totalAmount = purchases.reduce(
+        (total, item) =>
+            total + (Number(item.totalAmount) || 0),
+        0
+    );
+
     setText(
         "stockInQuantity",
-        formatNumber(getTotalItemsPurchased())
+        formatNumber(totalQuantity)
     );
 
     setText(
         "stockInAmount",
-        formatCurrency(getTotalPurchase())
+        formatCurrency(totalAmount)
     );
 
-    renderPurchaseTable();
+    renderPurchaseTable(purchases);
 }
 
-function renderPurchaseTable() {
+function getFilteredPurchases() {
+    const fromDate =
+        document.getElementById("purchaseFromDate")?.value || "";
+
+    const toDate =
+        document.getElementById("purchaseToDate")?.value || "";
+
+    return data.purchases
+        .filter(item => {
+            if (fromDate && item.date < fromDate) {
+                return false;
+            }
+
+            if (toDate && item.date > toDate) {
+                return false;
+            }
+
+            return true;
+        })
+        .sort((a, b) => {
+            const dateCompare =
+                String(b.date).localeCompare(String(a.date));
+
+            if (dateCompare !== 0) {
+                return dateCompare;
+            }
+
+            return Number(b.createdAt) - Number(a.createdAt);
+        });
+}
+
+function renderPurchaseTable(purchases) {
     const table = document.getElementById("purchaseTable");
 
-    if (!table) return;
-
-    const from = document.getElementById("purchaseFromDate")?.value;
-    const to = document.getElementById("purchaseToDate")?.value;
-
-    let purchases = [...data.purchases];
-
-    if (from) {
-        purchases = purchases.filter(item => item.date >= from);
+    if (!table) {
+        return;
     }
-
-    if (to) {
-        purchases = purchases.filter(item => item.date <= to);
-    }
-
-    purchases.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     if (!purchases.length) {
         table.innerHTML = `
             <tr>
-                <td colspan="7">No purchase records found.</td>
+                <td colspan="8">No purchase records found</td>
             </tr>
         `;
+
         return;
     }
 
@@ -568,250 +857,413 @@ function renderPurchaseTable() {
             <td>${formatCurrency(item.totalAmount)}</td>
             <td>${item.supplier || "-"}</td>
             <td>${item.reference || "-"}</td>
+            <td>${item.notes || "-"}</td>
             <td>
-                <button class="table-delete" onclick="deletePurchase('${item.id}')">
+                <button
+                    type="button"
+                    class="table-delete-btn"
+                    data-purchase-delete="${item.id}"
+                >
                     Delete
                 </button>
             </td>
         </tr>
     `).join("");
+
+    table.querySelectorAll("[data-purchase-delete]").forEach(button => {
+        button.addEventListener("click", () => {
+            deletePurchase(button.dataset.purchaseDelete);
+        });
+    });
 }
 
-function updateSalesPage() {
+function renderSalesPage() {
+    const sales = getFilteredSales();
+
+    const totalQuantity = sales.reduce(
+        (total, item) =>
+            total + (Number(item.quantity) || 0),
+        0
+    );
+
+    const totalAmount = sales.reduce(
+        (total, item) =>
+            total + (Number(item.totalAmount) || 0),
+        0
+    );
+
+    const totalProfit = sales.reduce((total, item) => {
+        const revenue = Number(item.totalAmount) || 0;
+        const cost = getSaleCost(item.id);
+
+        return total + revenue - cost;
+    }, 0);
+
     setText(
         "salesQuantity",
-        formatNumber(getTotalItemsSold())
+        formatNumber(totalQuantity)
     );
 
     setText(
         "salesAmount",
-        formatCurrency(getTotalSales())
+        formatCurrency(totalAmount)
     );
 
     setText(
         "salesProfit",
-        formatCurrency(getTotalProfit())
+        formatCurrency(totalProfit)
     );
 
-    renderSalesTable();
+    renderSalesTable(sales);
 }
 
-function renderSalesTable() {
+function getFilteredSales() {
+    const fromDate =
+        document.getElementById("salesFromDate")?.value || "";
+
+    const toDate =
+        document.getElementById("salesToDate")?.value || "";
+
+    return data.sales
+        .filter(item => {
+            if (fromDate && item.date < fromDate) {
+                return false;
+            }
+
+            if (toDate && item.date > toDate) {
+                return false;
+            }
+
+            return true;
+        })
+        .sort((a, b) => {
+            const dateCompare =
+                String(b.date).localeCompare(String(a.date));
+
+            if (dateCompare !== 0) {
+                return dateCompare;
+            }
+
+            return Number(b.createdAt) - Number(a.createdAt);
+        });
+}
+
+function renderSalesTable(sales) {
     const table = document.getElementById("salesTable");
 
-    if (!table) return;
-
-    const from = document.getElementById("salesFromDate")?.value;
-    const to = document.getElementById("salesToDate")?.value;
-
-    let sales = [...data.sales];
-
-    if (from) {
-        sales = sales.filter(item => item.date >= from);
+    if (!table) {
+        return;
     }
-
-    if (to) {
-        sales = sales.filter(item => item.date <= to);
-    }
-
-    sales.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     if (!sales.length) {
         table.innerHTML = `
             <tr>
-                <td colspan="8">No sales records found.</td>
+                <td colspan="9">No sales records found</td>
             </tr>
         `;
+
         return;
     }
 
-    table.innerHTML = sales.map(item => `
-        <tr>
-            <td>${formatDate(item.date)}</td>
-            <td>${formatNumber(item.quantity)}</td>
-            <td>${formatCurrency(item.unitPrice)}</td>
-            <td>${formatCurrency(item.totalAmount)}</td>
-            <td>${formatCurrency(item.costAmount)}</td>
-            <td>${formatCurrency(item.profit)}</td>
-            <td>${item.paymentMethod || "-"}</td>
-            <td>
-                <button class="table-delete" onclick="deleteSale('${item.id}')">
-                    Delete
-                </button>
-            </td>
-        </tr>
-    `).join("");
+    table.innerHTML = sales.map(item => {
+        const revenue = Number(item.totalAmount) || 0;
+        const cost = getSaleCost(item.id);
+        const profit = revenue - cost;
+
+        return `
+            <tr>
+                <td>${formatDate(item.date)}</td>
+                <td>${formatNumber(item.quantity)}</td>
+                <td>${formatCurrency(item.unitPrice)}</td>
+                <td>${formatCurrency(revenue)}</td>
+                <td>${formatCurrency(cost)}</td>
+                <td>${formatCurrency(profit)}</td>
+                <td>${item.paymentMethod || "-"}</td>
+                <td>${item.reference || "-"}</td>
+                <td>
+                    <button
+                        type="button"
+                        class="table-delete-btn"
+                        data-sale-delete="${item.id}"
+                    >
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    table.querySelectorAll("[data-sale-delete]").forEach(button => {
+        button.addEventListener("click", () => {
+            deleteSale(button.dataset.saleDelete);
+        });
+    });
 }
 
-function updateReports() {
-    const from = document.getElementById("reportFromDate")?.value;
-    const to = document.getElementById("reportToDate")?.value;
+function getReportData(fromDate, toDate) {
+    const purchases = data.purchases.filter(item => {
+        return (
+            (!fromDate || item.date >= fromDate) &&
+            (!toDate || item.date <= toDate)
+        );
+    });
 
-    let purchases = [...data.purchases];
-    let sales = [...data.sales];
+    const sales = data.sales.filter(item => {
+        return (
+            (!fromDate || item.date >= fromDate) &&
+            (!toDate || item.date <= toDate)
+        );
+    });
 
-    if (from) {
-        purchases = purchases.filter(item => item.date >= from);
-        sales = sales.filter(item => item.date >= from);
-    }
-
-    if (to) {
-        purchases = purchases.filter(item => item.date <= to);
-        sales = sales.filter(item => item.date <= to);
-    }
-
-    const purchaseAmount = purchases.reduce(
-        (total, item) => total + Number(item.totalAmount),
+    const totalPurchase = purchases.reduce(
+        (total, item) =>
+            total + (Number(item.totalAmount) || 0),
         0
     );
 
-    const salesAmount = sales.reduce(
-        (total, item) => total + Number(item.totalAmount),
-        0
-    );
-
-    const profit = sales.reduce(
-        (total, item) => total + Number(item.profit),
-        0
-    );
-
-    const itemsSold = sales.reduce(
-        (total, item) => total + Number(item.quantity),
+    const totalSales = sales.reduce(
+        (total, item) =>
+            total + (Number(item.totalAmount) || 0),
         0
     );
 
     const itemsPurchased = purchases.reduce(
-        (total, item) => total + Number(item.quantity),
+        (total, item) =>
+            total + (Number(item.quantity) || 0),
         0
     );
 
-    setText("reportPurchase", formatCurrency(purchaseAmount));
-    setText("reportSales", formatCurrency(salesAmount));
-    setText("reportProfit", formatCurrency(profit));
-    setText("reportItemsSold", formatNumber(itemsSold));
-    setText("reportItemsPurchased", formatNumber(itemsPurchased));
-    setText("reportCurrentStock", formatNumber(getCurrentStock()));
-
-    setText("profitSales", formatCurrency(salesAmount));
-
-    const cost = sales.reduce(
-        (total, item) => total + Number(item.costAmount),
+    const itemsSold = sales.reduce(
+        (total, item) =>
+            total + (Number(item.quantity) || 0),
         0
     );
 
-    setText("profitCost", formatCurrency(cost));
-    setText("profitTotal", formatCurrency(profit));
+    const profit = sales.reduce((total, item) => {
+        const revenue = Number(item.totalAmount) || 0;
+        const cost = getSaleCost(item.id);
 
-    updateReportChart(purchases, sales);
+        return total + revenue - cost;
+    }, 0);
+
+    return {
+        purchases,
+        sales,
+        totalPurchase,
+        totalSales,
+        itemsPurchased,
+        itemsSold,
+        profit
+    };
 }
 
-function updateSalesChart() {
-    const chart = document.getElementById("salesChart");
+function updateReports() {
+    const fromDate =
+        document.getElementById("reportFromDate")?.value || "";
 
-    if (!chart) return;
+    const toDate =
+        document.getElementById("reportToDate")?.value || "";
 
-    const sales = data.sales.reduce(
-        (total, item) => total + Number(item.totalAmount),
-        0
+    const report = getReportData(fromDate, toDate);
+
+    setText(
+        "reportPurchase",
+        formatCurrency(report.totalPurchase)
     );
 
-    const purchases = data.purchases.reduce(
-        (total, item) => total + Number(item.totalAmount),
-        0
+    setText(
+        "reportSales",
+        formatCurrency(report.totalSales)
     );
 
-    chart.innerHTML = `
-        <div class="chart-placeholder-content">
-            <strong>Sales Overview</strong>
-            <span>Sales: ${formatCurrency(sales)}</span>
-            <span>Purchase: ${formatCurrency(purchases)}</span>
-        </div>
-    `;
+    setText(
+        "reportProfit",
+        formatCurrency(report.profit)
+    );
+
+    setText(
+        "reportItemsSold",
+        formatNumber(report.itemsSold)
+    );
+
+    setText(
+        "reportItemsPurchased",
+        formatNumber(report.itemsPurchased)
+    );
+
+    setText(
+        "reportCurrentStock",
+        formatNumber(getCurrentStock())
+    );
+
+    setText(
+        "profitSales",
+        formatCurrency(report.totalSales)
+    );
+
+    const totalCost = report.totalSales - report.profit;
+
+    setText(
+        "profitCost",
+        formatCurrency(totalCost)
+    );
+
+    setText(
+        "profitTotal",
+        formatCurrency(report.profit)
+    );
+
+    updateReportChart(report);
 }
 
-function updateReportChart(purchases, sales) {
+function updateReportChart(report) {
     const chart = document.getElementById("purchaseSalesChart");
 
-    if (!chart) return;
+    if (!chart) {
+        return;
+    }
 
-    const purchaseAmount = purchases.reduce(
-        (total, item) => total + Number(item.totalAmount),
-        0
-    );
+    const purchase = report.totalPurchase;
+    const sales = report.totalSales;
+    const maxValue = Math.max(purchase, sales, 1);
 
-    const salesAmount = sales.reduce(
-        (total, item) => total + Number(item.totalAmount),
-        0
-    );
+    const purchaseHeight =
+        Math.max(5, (purchase / maxValue) * 100);
+
+    const salesHeight =
+        Math.max(5, (sales / maxValue) * 100);
 
     chart.innerHTML = `
-        <div class="chart-placeholder-content">
-            <strong>Purchase vs Sales</strong>
-            <span>Purchase: ${formatCurrency(purchaseAmount)}</span>
-            <span>Sales: ${formatCurrency(salesAmount)}</span>
+        <div class="chart-bars report-chart-bars">
+            <div class="chart-column">
+                <div class="chart-value">
+                    ${formatCurrency(purchase)}
+                </div>
+                <div
+                    class="chart-bar"
+                    style="height:${purchaseHeight}%"
+                ></div>
+                <div class="chart-label">
+                    Purchase
+                </div>
+            </div>
+
+            <div class="chart-column">
+                <div class="chart-value">
+                    ${formatCurrency(sales)}
+                </div>
+                <div
+                    class="chart-bar"
+                    style="height:${salesHeight}%"
+                ></div>
+                <div class="chart-label">
+                    Sales
+                </div>
+            </div>
         </div>
     `;
 }
 
 function loadSettings() {
-    setInputValue("storeName", data.settings.storeName);
-    setInputValue("storePhone", data.settings.phone);
-    setInputValue("storeAddress", data.settings.address);
+    const storeName =
+        document.getElementById("storeName");
 
-    setInputValue(
-        "defaultPurchasePrice",
-        data.settings.purchasePrice
-    );
+    const storePhone =
+        document.getElementById("storePhone");
 
-    setInputValue(
-        "defaultSellingPrice",
-        data.settings.sellingPrice
-    );
+    const storeAddress =
+        document.getElementById("storeAddress");
 
-    setInputValue(
-        "lowStockLimit",
-        data.settings.lowStockLimit
-    );
-}
+    const purchasePrice =
+        document.getElementById("defaultPurchasePrice");
 
-function setInputValue(id, value) {
-    const element = document.getElementById(id);
+    const sellingPrice =
+        document.getElementById("defaultSellingPrice");
 
-    if (element) {
-        element.value = value ?? "";
+    const lowStockLimit =
+        document.getElementById("lowStockLimit");
+
+    if (storeName) {
+        storeName.value =
+            data.settings.storeName || "";
+    }
+
+    if (storePhone) {
+        storePhone.value =
+            data.settings.phone || "";
+    }
+
+    if (storeAddress) {
+        storeAddress.value =
+            data.settings.address || "";
+    }
+
+    if (purchasePrice) {
+        purchasePrice.value =
+            data.settings.purchasePrice || "";
+    }
+
+    if (sellingPrice) {
+        sellingPrice.value =
+            data.settings.sellingPrice || "";
+    }
+
+    if (lowStockLimit) {
+        lowStockLimit.value =
+            data.settings.lowStockLimit || "";
     }
 }
 
 function saveStoreSettings() {
+    const storeName =
+        document.getElementById("storeName");
+
+    const storePhone =
+        document.getElementById("storePhone");
+
+    const storeAddress =
+        document.getElementById("storeAddress");
+
     data.settings.storeName =
-        document.getElementById("storeName")?.value.trim() || "Tracker";
+        storeName?.value.trim() || "Tracker";
 
     data.settings.phone =
-        document.getElementById("storePhone")?.value.trim() || "";
+        storePhone?.value.trim() || "";
 
     data.settings.address =
-        document.getElementById("storeAddress")?.value.trim() || "";
+        storeAddress?.value.trim() || "";
 
     saveData();
 
     alert("Store settings saved successfully.");
+
+    updateAll();
 }
 
-function saveInventorySettings() {
+function saveInventorySettingsHandler() {
+    const purchasePrice =
+        document.getElementById("defaultPurchasePrice");
+
+    const sellingPrice =
+        document.getElementById("defaultSellingPrice");
+
+    const lowStockLimit =
+        document.getElementById("lowStockLimit");
+
     data.settings.purchasePrice =
-        Number(document.getElementById("defaultPurchasePrice")?.value) || 0;
+        Math.max(0, Number(purchasePrice?.value) || 0);
 
     data.settings.sellingPrice =
-        Number(document.getElementById("defaultSellingPrice")?.value) || 0;
+        Math.max(0, Number(sellingPrice?.value) || 0);
 
     data.settings.lowStockLimit =
-        Number(document.getElementById("lowStockLimit")?.value) || 0;
+        Math.max(0, Number(lowStockLimit?.value) || 0);
 
     saveData();
 
-    updateAll();
-
     alert("Inventory settings saved successfully.");
+
+    updateAll();
 }
 
 function openModal(id) {
@@ -819,7 +1271,7 @@ function openModal(id) {
 
     if (modal) {
         modal.classList.add("show");
-        document.body.classList.add("modal-open");
+        modal.classList.remove("hidden");
     }
 }
 
@@ -828,103 +1280,64 @@ function closeModal(id) {
 
     if (modal) {
         modal.classList.remove("show");
-        document.body.classList.remove("modal-open");
+        modal.classList.add("hidden");
     }
 }
 
-function setupModals() {
-    document.getElementById("addStockBtn")?.addEventListener("click", () => {
-        resetStockForm();
-        openModal("stockModal");
-    });
-
-    document.getElementById("stockAdjustmentBtn")?.addEventListener("click", () => {
-        resetAdjustmentForm();
-        openModal("adjustmentModal");
-    });
-
-    document.getElementById("addSaleBtn")?.addEventListener("click", () => {
-        const stock = getCurrentStock();
-
-        if (stock <= 0) {
-            alert("There is no stock available for sale.");
-            return;
-        }
-
-        resetSaleForm();
-        openModal("saleModal");
-    });
-
-    document.getElementById("stockModalClose")?.addEventListener("click", () => {
-        closeModal("stockModal");
-    });
-
-    document.getElementById("stockModalCancel")?.addEventListener("click", () => {
-        closeModal("stockModal");
-    });
-
-    document.getElementById("saleModalClose")?.addEventListener("click", () => {
-        closeModal("saleModal");
-    });
-
-    document.getElementById("saleModalCancel")?.addEventListener("click", () => {
-        closeModal("saleModal");
-    });
-
-    document.getElementById("adjustmentModalClose")?.addEventListener("click", () => {
-        closeModal("adjustmentModal");
-    });
-
-    document.getElementById("adjustmentModalCancel")?.addEventListener("click", () => {
-        closeModal("adjustmentModal");
-    });
-
-    window.addEventListener("click", event => {
-        if (event.target.id === "stockModal") {
-            closeModal("stockModal");
-        }
-
-        if (event.target.id === "saleModal") {
-            closeModal("saleModal");
-        }
-
-        if (event.target.id === "adjustmentModal") {
-            closeModal("adjustmentModal");
-        }
-    });
-}
-
 function resetStockForm() {
-    document.getElementById("stockForm")?.reset();
+    const form = document.getElementById("stockForm");
 
-    setInputValue("stockDate", getToday());
-    setInputValue(
-        "purchasePrice",
-        data.settings.purchasePrice
-    );
+    if (form) {
+        form.reset();
+    }
+
+    const date = document.getElementById("stockDate");
+
+    if (date) {
+        date.value = getToday();
+    }
+
+    const purchasePrice =
+        document.getElementById("purchasePrice");
+
+    if (purchasePrice) {
+        purchasePrice.value =
+            data.settings.purchasePrice || "";
+    }
 
     updateStockTotal();
 }
 
 function resetSaleForm() {
-    document.getElementById("saleForm")?.reset();
+    const form = document.getElementById("saleForm");
 
-    setInputValue("saleDate", getToday());
-    setInputValue(
-        "sellingPrice",
-        data.settings.sellingPrice
-    );
+    if (form) {
+        form.reset();
+    }
 
-    setText(
-        "saleCurrentStock",
-        formatNumber(getCurrentStock())
-    );
+    const date = document.getElementById("saleDate");
 
-    updateSaleTotal();
+    if (date) {
+        date.value = getToday();
+    }
+
+    const sellingPrice =
+        document.getElementById("sellingPrice");
+
+    if (sellingPrice) {
+        sellingPrice.value =
+            data.settings.sellingPrice || "";
+    }
+
+    updateSaleCalculations();
 }
 
 function resetAdjustmentForm() {
-    document.getElementById("adjustmentForm")?.reset();
+    const form = document.getElementById("adjustmentForm");
+
+    if (form) {
+        form.reset();
+    }
 }
 
 function updateStockTotal() {
@@ -934,38 +1347,61 @@ function updateStockTotal() {
     const price =
         Number(document.getElementById("purchasePrice")?.value) || 0;
 
+    const total =
+        quantity * price;
+
     setText(
         "stockTotalAmount",
-        formatCurrency(quantity * price)
+        formatCurrency(total)
     );
 }
 
-function updateSaleTotal() {
+function updateSaleCalculations() {
     const quantity =
         Number(document.getElementById("saleQuantity")?.value) || 0;
 
     const price =
         Number(document.getElementById("sellingPrice")?.value) || 0;
 
-    const total = quantity * price;
-    const cost = quantity * getAveragePurchasePrice();
-    const profit = total - cost;
+    const currentStock =
+        getCurrentStock();
 
-    setText("saleTotalAmount", formatCurrency(total));
-    setText("saleProfitAmount", formatCurrency(profit));
+    const total =
+        quantity * price;
+
+    const averageCost =
+        getAveragePurchasePrice();
+
+    const profit =
+        quantity * (price - averageCost);
+
+    setText(
+        "saleCurrentStock",
+        formatNumber(currentStock)
+    );
+
+    setText(
+        "saleTotalAmount",
+        formatCurrency(total)
+    );
+
+    setText(
+        "saleProfitAmount",
+        formatCurrency(profit)
+    );
 }
 
 function handleStockSubmit(event) {
     event.preventDefault();
 
     const date =
-        document.getElementById("stockDate")?.value || getToday();
+        document.getElementById("stockDate")?.value;
 
     const quantity =
-        Number(document.getElementById("stockQuantity")?.value) || 0;
+        Number(document.getElementById("stockQuantity")?.value);
 
-    const unitPrice =
-        Number(document.getElementById("purchasePrice")?.value) || 0;
+    const purchasePrice =
+        Number(document.getElementById("purchasePrice")?.value);
 
     const supplier =
         document.getElementById("stockSupplier")?.value.trim() || "";
@@ -976,33 +1412,41 @@ function handleStockSubmit(event) {
     const notes =
         document.getElementById("stockNotes")?.value.trim() || "";
 
-    if (quantity <= 0) {
+    if (!date) {
+        alert("Please select a date.");
+        return;
+    }
+
+    if (!quantity || quantity <= 0) {
         alert("Please enter a valid quantity.");
         return;
     }
 
-    if (unitPrice < 0) {
+    if (purchasePrice < 0 || Number.isNaN(purchasePrice)) {
         alert("Please enter a valid purchase price.");
         return;
     }
 
-    const purchase = {
-        id: generateId("PUR"),
+    const totalAmount =
+        quantity * purchasePrice;
+
+    data.purchases.push({
+        id: generateId("purchase"),
         date,
+        createdAt: Date.now(),
         quantity,
-        unitPrice,
-        totalAmount: quantity * unitPrice,
+        unitPrice: purchasePrice,
+        totalAmount,
         supplier,
         reference,
         notes
-    };
-
-    data.purchases.push(purchase);
+    });
 
     saveData();
+
     closeModal("stockModal");
+    resetStockForm();
     updateAll();
-    renderPurchaseTable();
 
     alert("Stock added successfully.");
 }
@@ -1011,13 +1455,13 @@ function handleSaleSubmit(event) {
     event.preventDefault();
 
     const date =
-        document.getElementById("saleDate")?.value || getToday();
+        document.getElementById("saleDate")?.value;
 
     const quantity =
-        Number(document.getElementById("saleQuantity")?.value) || 0;
+        Number(document.getElementById("saleQuantity")?.value);
 
-    const unitPrice =
-        Number(document.getElementById("sellingPrice")?.value) || 0;
+    const sellingPrice =
+        Number(document.getElementById("sellingPrice")?.value);
 
     const paymentMethod =
         document.getElementById("paymentMethod")?.value || "";
@@ -1028,46 +1472,63 @@ function handleSaleSubmit(event) {
     const notes =
         document.getElementById("saleNotes")?.value.trim() || "";
 
-    const currentStock = getCurrentStock();
+    const currentStock =
+        getCurrentStock();
 
-    if (quantity <= 0) {
+    if (!date) {
+        alert("Please select a date.");
+        return;
+    }
+
+    if (!quantity || quantity <= 0) {
         alert("Please enter a valid quantity.");
         return;
     }
 
     if (quantity > currentStock) {
-        alert(`Only ${currentStock} pieces are currently available.`);
+        alert(
+            `You cannot sell ${quantity} pieces. Current stock is ${currentStock} pieces.`
+        );
+
         return;
     }
 
-    if (unitPrice < 0) {
+    if (sellingPrice < 0 || Number.isNaN(sellingPrice)) {
         alert("Please enter a valid selling price.");
         return;
     }
 
-    const totalAmount = quantity * unitPrice;
-    const costAmount = quantity * getAveragePurchasePrice();
-    const profit = totalAmount - costAmount;
+    const totalAmount =
+        quantity * sellingPrice;
 
-    const sale = {
-        id: generateId("SAL"),
+    const averageCost =
+        getAveragePurchasePrice();
+
+    const costAmount =
+        quantity * averageCost;
+
+    const profit =
+        totalAmount - costAmount;
+
+    data.sales.push({
+        id: generateId("sale"),
         date,
+        createdAt: Date.now(),
         quantity,
-        unitPrice,
+        unitPrice: sellingPrice,
         totalAmount,
         costAmount,
         profit,
         paymentMethod,
         reference,
         notes
-    };
-
-    data.sales.push(sale);
+    });
 
     saveData();
+
     closeModal("saleModal");
+    resetSaleForm();
     updateAll();
-    renderSalesTable();
 
     alert("Sale recorded successfully.");
 }
@@ -1079,7 +1540,7 @@ function handleAdjustmentSubmit(event) {
         document.getElementById("adjustmentType")?.value || "add";
 
     const quantity =
-        Number(document.getElementById("adjustmentQuantity")?.value) || 0;
+        Number(document.getElementById("adjustmentQuantity")?.value);
 
     const reason =
         document.getElementById("adjustmentReason")?.value.trim() || "";
@@ -1087,175 +1548,537 @@ function handleAdjustmentSubmit(event) {
     const notes =
         document.getElementById("adjustmentNotes")?.value.trim() || "";
 
-    if (quantity <= 0) {
+    const currentStock =
+        getCurrentStock();
+
+    if (!quantity || quantity <= 0) {
         alert("Please enter a valid quantity.");
         return;
     }
 
-    const adjustmentQuantity =
-        type === "remove" ? -quantity : quantity;
+    const signedQuantity =
+        type === "remove"
+            ? -quantity
+            : quantity;
 
     if (
-        type === "remove" &&
-        quantity > getCurrentStock()
+        signedQuantity < 0 &&
+        quantity > currentStock
     ) {
-        alert("Adjustment quantity cannot be greater than current stock.");
+        alert(
+            `You cannot remove ${quantity} pieces. Current stock is ${currentStock} pieces.`
+        );
+
         return;
     }
 
     data.adjustments.push({
-        id: generateId("ADJ"),
+        id: generateId("adjustment"),
         date: getToday(),
-        quantity: adjustmentQuantity,
+        createdAt: Date.now(),
+        quantity: signedQuantity,
         reason,
         notes
     });
 
     saveData();
+
     closeModal("adjustmentModal");
+    resetAdjustmentForm();
     updateAll();
 
     alert("Stock adjustment saved successfully.");
 }
-
 function deletePurchase(id) {
-    const purchase = data.purchases.find(item => item.id === id);
+    const purchase = data.purchases.find(
+        item => item.id === id
+    );
 
-    if (!purchase) return;
-
-    if (!confirm("Delete this purchase record?")) {
+    if (!purchase) {
         return;
     }
 
-    data.purchases = data.purchases.filter(item => item.id !== id);
+    const confirmed = confirm(
+        "Are you sure you want to delete this purchase record?"
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    data.purchases = data.purchases.filter(
+        item => item.id !== id
+    );
 
     saveData();
     updateAll();
+
+    alert("Purchase record deleted.");
 }
 
 function deleteSale(id) {
-    const sale = data.sales.find(item => item.id === id);
+    const sale = data.sales.find(
+        item => item.id === id
+    );
 
-    if (!sale) return;
-
-    if (!confirm("Delete this sales record?")) {
+    if (!sale) {
         return;
     }
 
-    data.sales = data.sales.filter(item => item.id !== id);
+    const confirmed = confirm(
+        "Are you sure you want to delete this sale record?"
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    data.sales = data.sales.filter(
+        item => item.id !== id
+    );
 
     saveData();
     updateAll();
+
+    alert("Sale record deleted.");
 }
 
-function setupForms() {
-    document.getElementById("stockForm")?.addEventListener(
-        "submit",
-        handleStockSubmit
-    );
+function setupModalEvents() {
+    const stockModal = document.getElementById("stockModal");
+    const saleModal = document.getElementById("saleModal");
+    const adjustmentModal =
+        document.getElementById("adjustmentModal");
 
-    document.getElementById("saleForm")?.addEventListener(
-        "submit",
-        handleSaleSubmit
-    );
+    const stockModalClose =
+        document.getElementById("stockModalClose");
 
-    document.getElementById("adjustmentForm")?.addEventListener(
-        "submit",
-        handleAdjustmentSubmit
-    );
+    const stockModalCancel =
+        document.getElementById("stockModalCancel");
 
-    document.getElementById("stockQuantity")?.addEventListener(
-        "input",
-        updateStockTotal
-    );
+    const saleModalClose =
+        document.getElementById("saleModalClose");
 
-    document.getElementById("purchasePrice")?.addEventListener(
-        "input",
-        updateStockTotal
-    );
+    const saleModalCancel =
+        document.getElementById("saleModalCancel");
 
-    document.getElementById("saleQuantity")?.addEventListener(
-        "input",
-        updateSaleTotal
-    );
+    const adjustmentModalClose =
+        document.getElementById("adjustmentModalClose");
 
-    document.getElementById("sellingPrice")?.addEventListener(
-        "input",
-        updateSaleTotal
-    );
+    const adjustmentModalCancel =
+        document.getElementById("adjustmentModalCancel");
 
-    document.getElementById("purchaseFromDate")?.addEventListener(
-        "change",
-        renderPurchaseTable
-    );
+    const addStockBtn =
+        document.getElementById("addStockBtn");
 
-    document.getElementById("purchaseToDate")?.addEventListener(
-        "change",
-        renderPurchaseTable
-    );
+    const addSaleBtn =
+        document.getElementById("addSaleBtn");
 
-    document.getElementById("salesFromDate")?.addEventListener(
-        "change",
-        renderSalesTable
-    );
+    const stockAdjustmentBtn =
+        document.getElementById("stockAdjustmentBtn");
 
-    document.getElementById("salesToDate")?.addEventListener(
-        "change",
-        renderSalesTable
-    );
+    if (addStockBtn) {
+        addStockBtn.addEventListener("click", () => {
+            resetStockForm();
+            openModal("stockModal");
+        });
+    }
 
-    document.getElementById("generateReportBtn")?.addEventListener(
-        "click",
-        updateReports
-    );
+    if (addSaleBtn) {
+        addSaleBtn.addEventListener("click", () => {
+            resetSaleForm();
+            openModal("saleModal");
+        });
+    }
 
-    document.getElementById("saveSettingsBtn")?.addEventListener(
-        "click",
-        saveStoreSettings
-    );
+    if (stockAdjustmentBtn) {
+        stockAdjustmentBtn.addEventListener("click", () => {
+            resetAdjustmentForm();
+            openModal("adjustmentModal");
+        });
+    }
 
-    document.getElementById("saveInventorySettings")?.addEventListener(
-        "click",
-        saveInventorySettings
-    );
+    if (stockModalClose) {
+        stockModalClose.addEventListener("click", () => {
+            closeModal("stockModal");
+        });
+    }
+
+    if (stockModalCancel) {
+        stockModalCancel.addEventListener("click", () => {
+            closeModal("stockModal");
+        });
+    }
+
+    if (saleModalClose) {
+        saleModalClose.addEventListener("click", () => {
+            closeModal("saleModal");
+        });
+    }
+
+    if (saleModalCancel) {
+        saleModalCancel.addEventListener("click", () => {
+            closeModal("saleModal");
+        });
+    }
+
+    if (adjustmentModalClose) {
+        adjustmentModalClose.addEventListener("click", () => {
+            closeModal("adjustmentModal");
+        });
+    }
+
+    if (adjustmentModalCancel) {
+        adjustmentModalCancel.addEventListener("click", () => {
+            closeModal("adjustmentModal");
+        });
+    }
+
+    [stockModal, saleModal, adjustmentModal].forEach(modal => {
+        if (!modal) {
+            return;
+        }
+
+        modal.addEventListener("click", event => {
+            if (event.target === modal) {
+                modal.classList.remove("show");
+                modal.classList.add("hidden");
+            }
+        });
+    });
+
+    const stockForm =
+        document.getElementById("stockForm");
+
+    const saleForm =
+        document.getElementById("saleForm");
+
+    const adjustmentForm =
+        document.getElementById("adjustmentForm");
+
+    if (stockForm) {
+        stockForm.addEventListener(
+            "submit",
+            handleStockSubmit
+        );
+    }
+
+    if (saleForm) {
+        saleForm.addEventListener(
+            "submit",
+            handleSaleSubmit
+        );
+    }
+
+    if (adjustmentForm) {
+        adjustmentForm.addEventListener(
+            "submit",
+            handleAdjustmentSubmit
+        );
+    }
+
+    const stockQuantity =
+        document.getElementById("stockQuantity");
+
+    const purchasePrice =
+        document.getElementById("purchasePrice");
+
+    const saleQuantity =
+        document.getElementById("saleQuantity");
+
+    const sellingPrice =
+        document.getElementById("sellingPrice");
+
+    if (stockQuantity) {
+        stockQuantity.addEventListener(
+            "input",
+            updateStockTotal
+        );
+    }
+
+    if (purchasePrice) {
+        purchasePrice.addEventListener(
+            "input",
+            updateStockTotal
+        );
+    }
+
+    if (saleQuantity) {
+        saleQuantity.addEventListener(
+            "input",
+            updateSaleCalculations
+        );
+    }
+
+    if (sellingPrice) {
+        sellingPrice.addEventListener(
+            "input",
+            updateSaleCalculations
+        );
+    }
+}
+
+function setupFilters() {
+    const purchaseFromDate =
+        document.getElementById("purchaseFromDate");
+
+    const purchaseToDate =
+        document.getElementById("purchaseToDate");
+
+    const salesFromDate =
+        document.getElementById("salesFromDate");
+
+    const salesToDate =
+        document.getElementById("salesToDate");
+
+    const reportFromDate =
+        document.getElementById("reportFromDate");
+
+    const reportToDate =
+        document.getElementById("reportToDate");
+
+    [
+        purchaseFromDate,
+        purchaseToDate
+    ].forEach(field => {
+        if (field) {
+            field.addEventListener(
+                "change",
+                renderPurchasePage
+            );
+        }
+    });
+
+    [
+        salesFromDate,
+        salesToDate
+    ].forEach(field => {
+        if (field) {
+            field.addEventListener(
+                "change",
+                renderSalesPage
+            );
+        }
+    });
+
+    [
+        reportFromDate,
+        reportToDate
+    ].forEach(field => {
+        if (field) {
+            field.addEventListener(
+                "change",
+                updateReports
+            );
+        }
+    });
+
+    const generateReportBtn =
+        document.getElementById("generateReportBtn");
+
+    if (generateReportBtn) {
+        generateReportBtn.addEventListener(
+            "click",
+            updateReports
+        );
+    }
+}
+
+function setupSettings() {
+    const saveSettingsBtn =
+        document.getElementById("saveSettingsBtn");
+
+    const saveInventorySettings =
+        document.getElementById("saveInventorySettings");
+
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener(
+            "click",
+            saveStoreSettings
+        );
+    }
+
+    if (saveInventorySettings) {
+        saveInventorySettings.addEventListener(
+            "click",
+            saveInventorySettingsHandler
+        );
+    }
 }
 
 function setupNavbar() {
-    const menuToggle = document.getElementById("menuToggle");
-    const navMenu = document.getElementById("navMenu");
+    const menuToggle =
+        document.getElementById("menuToggle");
 
-    menuToggle?.addEventListener("click", () => {
-        navMenu?.classList.toggle("open");
-        menuToggle.classList.toggle("active");
-    });
+    const navMenu =
+        document.getElementById("navMenu");
+
+    if (menuToggle && navMenu) {
+        menuToggle.addEventListener("click", () => {
+            navMenu.classList.toggle("show");
+
+            const expanded =
+                navMenu.classList.contains("show");
+
+            menuToggle.setAttribute(
+                "aria-expanded",
+                expanded ? "true" : "false"
+            );
+        });
+    }
 
     document.querySelectorAll(".nav-link").forEach(link => {
         link.addEventListener("click", () => {
-            document.querySelectorAll(".nav-link").forEach(item => {
-                item.classList.remove("active");
-            });
+            document
+                .querySelectorAll(".nav-link")
+                .forEach(item => {
+                    item.classList.remove("active");
+                });
 
             link.classList.add("active");
 
-            navMenu?.classList.remove("open");
-            menuToggle?.classList.remove("active");
+            if (navMenu) {
+                navMenu.classList.remove("show");
+            }
+
+            if (menuToggle) {
+                menuToggle.setAttribute(
+                    "aria-expanded",
+                    "false"
+                );
+            }
+        });
+    });
+}
+
+function setupReportExport() {
+    const exportButton =
+        document.getElementById("exportReportBtn");
+
+    if (!exportButton) {
+        return;
+    }
+
+    exportButton.addEventListener("click", () => {
+        const fromDate =
+            document.getElementById("reportFromDate")?.value || "";
+
+        const toDate =
+            document.getElementById("reportToDate")?.value || "";
+
+        const report =
+            getReportData(fromDate, toDate);
+
+        const rows = [
+            [
+                "Tracker Report",
+                "",
+                "",
+                ""
+            ],
+            [
+                "From",
+                fromDate || "-",
+                "To",
+                toDate || "-"
+            ],
+            [],
+            [
+                "Metric",
+                "Value"
+            ],
+            [
+                "Total Purchase",
+                report.totalPurchase
+            ],
+            [
+                "Total Sales",
+                report.totalSales
+            ],
+            [
+                "Total Profit",
+                report.profit
+            ],
+            [
+                "Items Purchased",
+                report.itemsPurchased
+            ],
+            [
+                "Items Sold",
+                report.itemsSold
+            ],
+            [
+                "Current Stock",
+                getCurrentStock()
+            ]
+        ];
+
+        const csv = rows
+            .map(row =>
+                row.map(value => {
+                    const text = String(value ?? "");
+
+                    return `"${text.replace(/"/g, '""')}"`
+                }).join(",")
+            )
+            .join("\n");
+
+        const blob = new Blob(
+            [csv],
+            {
+                type: "text/csv;charset=utf-8;"
+            }
+        );
+
+        const url =
+            URL.createObjectURL(blob);
+
+        const link =
+            document.createElement("a");
+
+        link.href = url;
+        link.download =
+            `tracker-report-${getToday()}.csv`;
+
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        URL.revokeObjectURL(url);
+    });
+}
+
+function setupNavigation() {
+    const links =
+        document.querySelectorAll(".nav-link");
+
+    links.forEach(link => {
+        link.addEventListener("click", event => {
+            const target =
+                link.getAttribute("href");
+
+            if (!target || target === "#") {
+                event.preventDefault();
+            }
         });
     });
 }
 
 function updateAll() {
     updateDashboard();
-    updateStockPage();
-    updatePurchasePage();
-    updateSalesPage();
+    renderStockPage();
+    renderPurchasePage();
+    renderSalesPage();
     updateReports();
+    loadSettings();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
     initializeDates();
-    loadSettings();
+    setupModalEvents();
+    setupFilters();
+    setupSettings();
     setupNavbar();
-    setupModals();
-    setupForms();
+    setupReportExport();
+    setupNavigation();
     updateAll();
 });
