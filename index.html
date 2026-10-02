@@ -12,84 +12,117 @@
     <header class="navbar">
         <div class="nav-container">
 
-            <a href="#" class="brand">Tracker</a>
+            <a href="#dashboard" class="brand">Tracker</a>
 
-            <nav class="nav-menu">
+            <nav class="nav-menu" id="navMenu">
                 <a href="#dashboard" class="nav-link active">Dashboard</a>
-                <a href="#products" class="nav-link">Products</a>
-                <a href="#orders" class="nav-link">Orders</a>
+                <a href="#stock" class="nav-link">Stock</a>
+                <a href="#stock-in" class="nav-link">Stock In</a>
                 <a href="#sales" class="nav-link">Sales</a>
-                <a href="#customers" class="nav-link">Customers</a>
                 <a href="#reports" class="nav-link">Reports</a>
                 <a href="#settings" class="nav-link">Settings</a>
             </nav>
 
             <div class="nav-actions">
-                
-
-                <div class="profile" id="profileMenu">
+                <div class="profile">
                     <div class="profile-avatar">A</div>
                     <div class="profile-info">
                         <span class="profile-name">Admin</span>
-                        <span class="profile-role">Administrator</span>
+                        <span class="profile-role">Store Manager</span>
                     </div>
                 </div>
-            </div>
 
-            <button class="menu-toggle" id="menuToggle">
-                ☰
-            </button>
+                <button class="menu-toggle" id="menuToggle">☰</button>
+            </div>
 
         </div>
     </header>
 
     <main>
 
-        <section class="page-section dashboard-section" id="dashboard">
+        <section class="page-section" id="dashboard">
 
             <div class="page-header">
                 <div>
                     <p class="page-label">OVERVIEW</p>
                     <h1>Dashboard</h1>
-                    <p>Manage your clothing store from one place.</p>
+                    <p>Monitor your stock, purchases, sales and profit.</p>
                 </div>
 
-                <button class="primary-btn" id="addOrderBtn">
-                    + New Order
-                </button>
+                <div class="dashboard-date" id="currentDate"></div>
             </div>
 
             <div class="stats-grid">
 
                 <div class="stat-card">
-                   
+                    <div class="stat-icon">📦</div>
+                    <div>
+                        <span>Current Stock</span>
+                        <h2 id="currentStock">0</h2>
+                        <small>Kurtha Surwal</small>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🛒</div>
+                    <div>
+                        <span>Total Purchase</span>
+                        <h2 id="totalPurchase">Rs. 0</h2>
+                        <small>All time</small>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">💰</div>
                     <div>
                         <span>Total Sales</span>
                         <h2 id="totalSales">Rs. 0</h2>
+                        <small>All time</small>
                     </div>
                 </div>
 
                 <div class="stat-card">
-                   
+                    <div class="stat-icon">📈</div>
                     <div>
-                        <span>Total Orders</span>
-                        <h2 id="totalOrders">0</h2>
+                        <span>Total Profit</span>
+                        <h2 id="totalProfit">Rs. 0</h2>
+                        <small>All time</small>
                     </div>
                 </div>
 
-                <div class="stat-card">
-                 
+            </div>
+
+            <div class="stats-grid secondary-stats">
+
+                <div class="stat-card small-stat">
+                    <div class="stat-icon">📅</div>
                     <div>
-                        <span>Total Products</span>
-                        <h2 id="totalProducts">0</h2>
+                        <span>Today's Sales</span>
+                        <h2 id="todaySales">Rs. 0</h2>
                     </div>
                 </div>
 
-                <div class="stat-card">
-                   
+                <div class="stat-card small-stat">
+                    <div class="stat-icon">🚚</div>
                     <div>
-                        <span>Low Stock</span>
-                        <h2 id="lowStock">0</h2>
+                        <span>Today's Purchase</span>
+                        <h2 id="todayPurchase">Rs. 0</h2>
+                    </div>
+                </div>
+
+                <div class="stat-card small-stat">
+                    <div class="stat-icon">⬆️</div>
+                    <div>
+                        <span>Total Items Purchased</span>
+                        <h2 id="totalItemsPurchased">0</h2>
+                    </div>
+                </div>
+
+                <div class="stat-card small-stat">
+                    <div class="stat-icon">⬇️</div>
+                    <div>
+                        <span>Total Items Sold</span>
+                        <h2 id="totalItemsSold">0</h2>
                     </div>
                 </div>
 
@@ -97,14 +130,14 @@
 
             <div class="dashboard-grid">
 
-                <div class="panel sales-panel">
+                <div class="panel">
                     <div class="panel-header">
                         <div>
                             <h3>Sales Overview</h3>
-                            <p>Your sales performance</p>
+                            <p>Sales performance over time</p>
                         </div>
 
-                        <select id="salesPeriod">
+                        <select id="dashboardPeriod">
                             <option value="7">Last 7 Days</option>
                             <option value="30">Last 30 Days</option>
                             <option value="90">Last 3 Months</option>
@@ -112,217 +145,300 @@
                         </select>
                     </div>
 
-                    <div class="chart-placeholder" id="salesChart">
-                        <span>Sales chart will appear here</span>
+                    <div class="chart-area" id="salesChart">
+                        <div class="chart-empty">
+                            <span>Sales chart will appear here</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="panel stock-panel">
+                <div class="panel">
                     <div class="panel-header">
                         <div>
-                            <h3>Stock Status</h3>
-                            <p>Current inventory overview</p>
+                            <h3>Stock Summary</h3>
+                            <p>Current inventory status</p>
                         </div>
                     </div>
 
                     <div class="stock-summary">
-                        <div class="stock-item">
-                            <span>In Stock</span>
-                            <strong id="inStock">0</strong>
+
+                        <div class="summary-row">
+                            <span>Opening Stock</span>
+                            <strong id="openingStock">0</strong>
                         </div>
 
-                        <div class="stock-item">
-                            <span>Low Stock</span>
-                            <strong id="dashboardLowStock">0</strong>
+                        <div class="summary-row positive">
+                            <span>Stock In</span>
+                            <strong id="summaryStockIn">+0</strong>
                         </div>
 
-                        <div class="stock-item">
-                            <span>Out of Stock</span>
-                            <strong id="outOfStock">0</strong>
+                        <div class="summary-row negative">
+                            <span>Stock Out</span>
+                            <strong id="summaryStockOut">-0</strong>
+                        </div>
+
+                        <div class="summary-row total">
+                            <span>Current Stock</span>
+                            <strong id="summaryCurrentStock">0</strong>
+                        </div>
+
+                    </div>
+
+                    <div class="low-stock-alert" id="lowStockAlert">
+                        <span>⚠️</span>
+                        <div>
+                            <strong>Low Stock</strong>
+                            <p>Stock is running low.</p>
                         </div>
                     </div>
+
                 </div>
 
             </div>
 
-            <div class="dashboard-grid">
+            <div class="panel">
 
-                <div class="panel">
-                    <div class="panel-header">
-                        <div>
-                            <h3>Recent Orders</h3>
-                            <p>Latest customer orders</p>
-                        </div>
-
-                        <a href="#orders" class="view-link">View All</a>
+                <div class="panel-header">
+                    <div>
+                        <h3>Recent Activity</h3>
+                        <p>Latest stock and sales transactions</p>
                     </div>
 
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Order ID</th>
-                                    <th>Customer</th>
-                                    <th>Items</th>
-                                    <th>Total</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-
-                            <tbody id="recentOrders">
-                                <tr>
-                                    <td colspan="5" class="empty-state">
-                                        No orders yet
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <a href="#reports" class="view-link">View All</a>
                 </div>
 
-                <div class="panel">
-                    <div class="panel-header">
-                        <div>
-                            <h3>Low Stock Products</h3>
-                            <p>Products that need attention</p>
-                        </div>
+                <div class="table-container">
 
-                        <a href="#products" class="view-link">View All</a>
-                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Quantity</th>
+                                <th>Amount</th>
+                                <th>Reference</th>
+                            </tr>
+                        </thead>
 
-                    <div class="low-stock-list" id="lowStockList">
-                        <div class="empty-state">
-                            No low-stock products
-                        </div>
-                    </div>
+                        <tbody id="recentActivity">
+                            <tr>
+                                <td colspan="5" class="empty-state">
+                                    No activity recorded yet
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
                 </div>
 
             </div>
 
         </section>
 
-        <section class="page-section" id="products">
+        <section class="page-section" id="stock">
 
             <div class="page-header">
                 <div>
                     <p class="page-label">INVENTORY</p>
-                    <h1>Products</h1>
-                    <p>Manage your clothing products and stock.</p>
+                    <h1>Stock</h1>
+                    <p>View and manage your current Kurtha Surwal stock.</p>
                 </div>
 
-                <button class="primary-btn" id="addProductBtn">
-                    + Add Product
+                <button class="primary-btn" id="stockAdjustmentBtn">
+                    Stock Adjustment
                 </button>
             </div>
 
-            <div class="toolbar">
-                <div class="search-box">
-                    <input type="text" id="productSearch" placeholder="Search products...">
+            <div class="stock-overview">
+
+                <div class="stock-box">
+                    <span>Current Quantity</span>
+                    <strong id="stockPageQuantity">0</strong>
+                    <small>pieces</small>
                 </div>
 
-                <select id="categoryFilter">
-                    <option value="all">All Categories</option>
-                    <option value="shirts">Shirts</option>
-                    <option value="tshirts">T-Shirts</option>
-                    <option value="pants">Pants</option>
-                    <option value="jeans">Jeans</option>
-                    <option value="jackets">Jackets</option>
-                    <option value="dresses">Dresses</option>
-                    <option value="other">Other</option>
-                </select>
+                <div class="stock-box">
+                    <span>Purchase Value</span>
+                    <strong id="stockPurchaseValue">Rs. 0</strong>
+                    <small>current stock</small>
+                </div>
 
-                <select id="stockFilter">
-                    <option value="all">All Stock</option>
-                    <option value="in-stock">In Stock</option>
-                    <option value="low-stock">Low Stock</option>
-                    <option value="out-of-stock">Out of Stock</option>
-                </select>
+                <div class="stock-box">
+                    <span>Sales Value</span>
+                    <strong id="stockSalesValue">Rs. 0</strong>
+                    <small>current stock</small>
+                </div>
+
+                <div class="stock-box">
+                    <span>Potential Profit</span>
+                    <strong id="potentialProfit">Rs. 0</strong>
+                    <small>if all stock is sold</small>
+                </div>
+
             </div>
 
             <div class="panel">
+
+                <div class="panel-header">
+                    <div>
+                        <h3>Current Stock</h3>
+                        <p>Kurtha Surwal inventory</p>
+                    </div>
+
+                    <div class="stock-status" id="stockStatus">
+                        In Stock
+                    </div>
+                </div>
+
+                <div class="stock-detail-grid">
+
+                    <div class="stock-detail">
+                        <span>Product</span>
+                        <strong>Kurtha Surwal</strong>
+                    </div>
+
+                    <div class="stock-detail">
+                        <span>Current Quantity</span>
+                        <strong id="detailCurrentStock">0 pieces</strong>
+                    </div>
+
+                    <div class="stock-detail">
+                        <span>Purchase Price</span>
+                        <strong id="detailPurchasePrice">Rs. 0</strong>
+                    </div>
+
+                    <div class="stock-detail">
+                        <span>Selling Price</span>
+                        <strong id="detailSellingPrice">Rs. 0</strong>
+                    </div>
+
+                    <div class="stock-detail">
+                        <span>Low Stock Limit</span>
+                        <strong id="detailLowStock">10 pieces</strong>
+                    </div>
+
+                    <div class="stock-detail">
+                        <span>Stock Value</span>
+                        <strong id="detailStockValue">Rs. 0</strong>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="panel">
+
+                <div class="panel-header">
+                    <div>
+                        <h3>Stock Movement</h3>
+                        <p>Complete history of stock changes</p>
+                    </div>
+                </div>
+
                 <div class="table-container">
+
                     <table>
                         <thead>
                             <tr>
-                                <th>Product</th>
-                                <th>Category</th>
-                                <th>Size</th>
-                                <th>Color</th>
-                                <th>Price</th>
-                                <th>Stock</th>
-                                <th>Status</th>
-                                <th>Action</th>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Quantity</th>
+                                <th>Stock Before</th>
+                                <th>Stock After</th>
+                                <th>Reference</th>
+                                <th>Notes</th>
                             </tr>
                         </thead>
 
-                        <tbody id="productTable">
+                        <tbody id="stockMovementTable">
                             <tr>
-                                <td colspan="8" class="empty-state">
-                                    No products added yet
+                                <td colspan="7" class="empty-state">
+                                    No stock movement recorded yet
                                 </td>
                             </tr>
                         </tbody>
                     </table>
+
                 </div>
+
             </div>
 
         </section>
 
-        <section class="page-section" id="orders">
+        <section class="page-section" id="stock-in">
 
             <div class="page-header">
                 <div>
-                    <p class="page-label">ORDERS</p>
-                    <h1>Orders</h1>
-                    <p>Track and manage customer orders.</p>
+                    <p class="page-label">PURCHASE</p>
+                    <h1>Stock In</h1>
+                    <p>Record new Kurtha Surwal purchases.</p>
                 </div>
 
-                <button class="primary-btn" id="ordersAddBtn">
-                    + New Order
+                <button class="primary-btn" id="addStockBtn">
+                    + Add Stock
                 </button>
             </div>
 
-            <div class="toolbar">
-                <div class="search-box">
-                    <input type="text" id="orderSearch" placeholder="Search orders...">
+            <div class="stats-grid">
+
+                <div class="stat-card">
+                    <div class="stat-icon">⬆️</div>
+                    <div>
+                        <span>Total Items Purchased</span>
+                        <h2 id="stockInQuantity">0</h2>
+                    </div>
                 </div>
 
-                <select id="orderStatusFilter">
-                    <option value="all">All Orders</option>
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
-                </select>
+                <div class="stat-card">
+                    <div class="stat-icon">💵</div>
+                    <div>
+                        <span>Total Purchase</span>
+                        <h2 id="stockInAmount">Rs. 0</h2>
+                    </div>
+                </div>
+
             </div>
 
             <div class="panel">
+
+                <div class="panel-header">
+                    <div>
+                        <h3>Purchase History</h3>
+                        <p>All stock purchases</p>
+                    </div>
+
+                    <div class="date-filter">
+                        <input type="date" id="purchaseFromDate">
+                        <input type="date" id="purchaseToDate">
+                    </div>
+                </div>
+
                 <div class="table-container">
+
                     <table>
                         <thead>
                             <tr>
-                                <th>Order ID</th>
-                                <th>Customer</th>
                                 <th>Date</th>
-                                <th>Items</th>
-                                <th>Total</th>
-                                <th>Payment</th>
-                                <th>Status</th>
-                                <th>Action</th>
+                                <th>Reference</th>
+                                <th>Quantity</th>
+                                <th>Unit Price</th>
+                                <th>Total Amount</th>
+                                <th>Supplier</th>
+                                <th>Notes</th>
                             </tr>
                         </thead>
 
-                        <tbody id="orderTable">
+                        <tbody id="purchaseTable">
                             <tr>
-                                <td colspan="8" class="empty-state">
-                                    No orders yet
+                                <td colspan="7" class="empty-state">
+                                    No purchases recorded yet
                                 </td>
                             </tr>
                         </tbody>
                     </table>
+
                 </div>
+
             </div>
 
         </section>
@@ -331,132 +447,85 @@
 
             <div class="page-header">
                 <div>
-                    <p class="page-label">FINANCIAL</p>
+                    <p class="page-label">SALES</p>
                     <h1>Sales</h1>
-                    <p>Track your store's sales and revenue.</p>
+                    <p>Record and track Kurtha Surwal sales.</p>
                 </div>
 
-                <select id="salesReportPeriod">
-                    <option value="today">Today</option>
-                    <option value="week">This Week</option>
-                    <option value="month">This Month</option>
-                    <option value="year">This Year</option>
-                </select>
+                <button class="primary-btn" id="addSaleBtn">
+                    + Record Sale
+                </button>
             </div>
 
             <div class="stats-grid">
 
                 <div class="stat-card">
-                    
+                    <div class="stat-icon">⬇️</div>
                     <div>
-                        <span>Revenue</span>
-                        <h2 id="salesRevenue">Rs. 0</h2>
+                        <span>Total Items Sold</span>
+                        <h2 id="salesQuantity">0</h2>
                     </div>
                 </div>
 
                 <div class="stat-card">
-                 
+                    <div class="stat-icon">💰</div>
                     <div>
-                        <span>Orders</span>
-                        <h2 id="salesOrders">0</h2>
+                        <span>Total Sales</span>
+                        <h2 id="salesAmount">Rs. 0</h2>
                     </div>
                 </div>
 
                 <div class="stat-card">
-                   
+                    <div class="stat-icon">📈</div>
                     <div>
-                        <span>Average Order</span>
-                        <h2 id="averageOrder">Rs. 0</h2>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                 
-                    <div>
-                        <span>Refunds</span>
-                        <h2 id="refunds">Rs. 0</h2>
+                        <span>Total Profit</span>
+                        <h2 id="salesProfit">Rs. 0</h2>
                     </div>
                 </div>
 
             </div>
 
             <div class="panel">
+
                 <div class="panel-header">
                     <div>
-                        <h3>Sales Transactions</h3>
-                        <p>Detailed sales records</p>
+                        <h3>Sales History</h3>
+                        <p>All recorded sales</p>
+                    </div>
+
+                    <div class="date-filter">
+                        <input type="date" id="salesFromDate">
+                        <input type="date" id="salesToDate">
                     </div>
                 </div>
 
                 <div class="table-container">
+
                     <table>
                         <thead>
                             <tr>
                                 <th>Date</th>
-                                <th>Order ID</th>
-                                <th>Customer</th>
-                                <th>Amount</th>
-                                <th>Payment Method</th>
+                                <th>Reference</th>
+                                <th>Quantity</th>
+                                <th>Unit Price</th>
+                                <th>Total Sale</th>
+                                <th>Profit</th>
+                                <th>Payment</th>
+                                <th>Notes</th>
                             </tr>
                         </thead>
 
                         <tbody id="salesTable">
                             <tr>
-                                <td colspan="5" class="empty-state">
+                                <td colspan="8" class="empty-state">
                                     No sales recorded yet
                                 </td>
                             </tr>
                         </tbody>
                     </table>
-                </div>
-            </div>
 
-        </section>
-
-        <section class="page-section" id="customers">
-
-            <div class="page-header">
-                <div>
-                    <p class="page-label">CUSTOMERS</p>
-                    <h1>Customers</h1>
-                    <p>Manage your customer information.</p>
                 </div>
 
-                <button class="primary-btn" id="addCustomerBtn">
-                    + Add Customer
-                </button>
-            </div>
-
-            <div class="toolbar">
-                <div class="search-box">
-                    <input type="text" id="customerSearch" placeholder="Search customers...">
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Customer</th>
-                                <th>Phone</th>
-                                <th>Email</th>
-                                <th>Total Orders</th>
-                                <th>Total Spent</th>
-                                <th>Last Order</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-
-                        <tbody id="customerTable">
-                            <tr>
-                                <td colspan="7" class="empty-state">
-                                    No customers added yet
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
             </div>
 
         </section>
@@ -467,7 +536,7 @@
                 <div>
                     <p class="page-label">ANALYTICS</p>
                     <h1>Reports</h1>
-                    <p>Analyze your store performance.</p>
+                    <p>Analyze purchases, sales, stock and profit.</p>
                 </div>
 
                 <button class="secondary-btn" id="exportReportBtn">
@@ -475,34 +544,105 @@
                 </button>
             </div>
 
-            <div class="reports-grid">
+            <div class="report-filter">
 
-                <div class="report-card">
-                    <span>Sales Report</span>
-                    <h3>Revenue & Sales</h3>
-                    <p>View detailed sales performance.</p>
-                    <button class="secondary-btn">View Report</button>
+                <div>
+                    <label for="reportFromDate">From</label>
+                    <input type="date" id="reportFromDate">
                 </div>
 
-                <div class="report-card">
-                    <span>Inventory Report</span>
-                    <h3>Stock Analysis</h3>
-                    <p>Analyze your current inventory.</p>
-                    <button class="secondary-btn">View Report</button>
+                <div>
+                    <label for="reportToDate">To</label>
+                    <input type="date" id="reportToDate">
                 </div>
 
-                <div class="report-card">
-                    <span>Product Report</span>
-                    <h3>Best Sellers</h3>
-                    <p>Find your most popular products.</p>
-                    <button class="secondary-btn">View Report</button>
+                <button class="primary-btn" id="generateReportBtn">
+                    Generate Report
+                </button>
+
+            </div>
+
+            <div class="report-stats">
+
+                <div class="report-stat">
+                    <span>Total Purchase</span>
+                    <strong id="reportPurchase">Rs. 0</strong>
                 </div>
 
-                <div class="report-card">
-                    <span>Customer Report</span>
-                    <h3>Customer Activity</h3>
-                    <p>Understand customer purchasing behavior.</p>
-                    <button class="secondary-btn">View Report</button>
+                <div class="report-stat">
+                    <span>Total Sales</span>
+                    <strong id="reportSales">Rs. 0</strong>
+                </div>
+
+                <div class="report-stat">
+                    <span>Total Profit</span>
+                    <strong id="reportProfit">Rs. 0</strong>
+                </div>
+
+                <div class="report-stat">
+                    <span>Items Sold</span>
+                    <strong id="reportItemsSold">0</strong>
+                </div>
+
+                <div class="report-stat">
+                    <span>Items Purchased</span>
+                    <strong id="reportItemsPurchased">0</strong>
+                </div>
+
+                <div class="report-stat">
+                    <span>Current Stock</span>
+                    <strong id="reportCurrentStock">0</strong>
+                </div>
+
+            </div>
+
+            <div class="dashboard-grid">
+
+                <div class="panel">
+
+                    <div class="panel-header">
+                        <div>
+                            <h3>Purchase vs Sales</h3>
+                            <p>Financial comparison</p>
+                        </div>
+                    </div>
+
+                    <div class="chart-area" id="purchaseSalesChart">
+                        <div class="chart-empty">
+                            <span>Report chart will appear here</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="panel">
+
+                    <div class="panel-header">
+                        <div>
+                            <h3>Profit Summary</h3>
+                            <p>Financial overview</p>
+                        </div>
+                    </div>
+
+                    <div class="profit-summary">
+
+                        <div class="summary-row">
+                            <span>Sales Revenue</span>
+                            <strong id="profitSales">Rs. 0</strong>
+                        </div>
+
+                        <div class="summary-row">
+                            <span>Cost of Goods Sold</span>
+                            <strong id="profitCost">Rs. 0</strong>
+                        </div>
+
+                        <div class="summary-row total">
+                            <span>Gross Profit</span>
+                            <strong id="profitTotal">Rs. 0</strong>
+                        </div>
+
+                    </div>
+
                 </div>
 
             </div>
@@ -515,13 +655,14 @@
                 <div>
                     <p class="page-label">SYSTEM</p>
                     <h1>Settings</h1>
-                    <p>Configure your Tracker software.</p>
+                    <p>Configure your Tracker system.</p>
                 </div>
             </div>
 
             <div class="settings-grid">
 
                 <div class="panel settings-panel">
+
                     <h3>Store Information</h3>
 
                     <div class="form-group">
@@ -530,13 +671,8 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="storePhone">Phone</label>
+                        <label for="storePhone">Phone Number</label>
                         <input type="text" id="storePhone" placeholder="Enter phone number">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="storeEmail">Email</label>
-                        <input type="email" id="storeEmail" placeholder="Enter email">
                     </div>
 
                     <div class="form-group">
@@ -547,28 +683,32 @@
                     <button class="primary-btn" id="saveSettingsBtn">
                         Save Changes
                     </button>
+
                 </div>
 
                 <div class="panel settings-panel">
-                    <h3>System Preferences</h3>
 
-                    <div class="setting-row">
-                        <div>
-                            <strong>Low Stock Alert</strong>
-                            <p>Show alerts when products reach low stock.</p>
-                        </div>
+                    <h3>Inventory Settings</h3>
 
-                        <input type="checkbox" id="lowStockAlert" checked>
+                    <div class="form-group">
+                        <label for="defaultPurchasePrice">Default Purchase Price</label>
+                        <input type="number" id="defaultPurchasePrice" placeholder="Rs. 0">
                     </div>
 
-                    <div class="setting-row">
-                        <div>
-                            <strong>Order Notifications</strong>
-                            <p>Receive notifications for new orders.</p>
-                        </div>
-
-                        <input type="checkbox" id="orderNotifications" checked>
+                    <div class="form-group">
+                        <label for="defaultSellingPrice">Default Selling Price</label>
+                        <input type="number" id="defaultSellingPrice" placeholder="Rs. 0">
                     </div>
+
+                    <div class="form-group">
+                        <label for="lowStockLimit">Low Stock Limit</label>
+                        <input type="number" id="lowStockLimit" value="10">
+                    </div>
+
+                    <button class="primary-btn" id="saveInventorySettings">
+                        Save Settings
+                    </button>
+
                 </div>
 
             </div>
@@ -577,41 +717,33 @@
 
     </main>
 
-    <div class="modal" id="productModal">
+    <div class="modal" id="stockModal">
+
         <div class="modal-content">
 
             <div class="modal-header">
                 <div>
-                    <h2>Add Product</h2>
-                    <p>Add a new clothing item to your inventory.</p>
+                    <h2>Add Stock</h2>
+                    <p>Record a new Kurtha Surwal purchase.</p>
                 </div>
 
-                <button class="modal-close" id="productModalClose">
+                <button class="modal-close" id="stockModalClose">
                     ×
                 </button>
             </div>
 
-            <form id="productForm">
+            <form id="stockForm">
 
                 <div class="form-row">
 
                     <div class="form-group">
-                        <label for="productName">Product Name</label>
-                        <input type="text" id="productName" required>
+                        <label for="stockDate">Date</label>
+                        <input type="date" id="stockDate" required>
                     </div>
 
                     <div class="form-group">
-                        <label for="productCategory">Category</label>
-                        <select id="productCategory" required>
-                            <option value="">Select Category</option>
-                            <option value="shirts">Shirts</option>
-                            <option value="tshirts">T-Shirts</option>
-                            <option value="pants">Pants</option>
-                            <option value="jeans">Jeans</option>
-                            <option value="jackets">Jackets</option>
-                            <option value="dresses">Dresses</option>
-                            <option value="other">Other</option>
-                        </select>
+                        <label for="stockQuantity">Quantity</label>
+                        <input type="number" id="stockQuantity" min="1" required>
                     </div>
 
                 </div>
@@ -619,148 +751,205 @@
                 <div class="form-row">
 
                     <div class="form-group">
-                        <label for="productSize">Size</label>
-                        <select id="productSize">
-                            <option value="">Select Size</option>
-                            <option value="XS">XS</option>
-                            <option value="S">S</option>
-                            <option value="M">M</option>
-                            <option value="L">L</option>
-                            <option value="XL">XL</option>
-                            <option value="XXL">XXL</option>
-                        </select>
+                        <label for="purchasePrice">Purchase Price Per Piece</label>
+                        <input type="number" id="purchasePrice" min="0" required>
                     </div>
 
                     <div class="form-group">
-                        <label for="productColor">Color</label>
-                        <input type="text" id="productColor">
+                        <label for="stockSupplier">Supplier</label>
+                        <input type="text" id="stockSupplier" placeholder="Optional">
                     </div>
 
                 </div>
 
-                <div class="form-row">
-
-                    <div class="form-group">
-                        <label for="productPrice">Selling Price</label>
-                        <input type="number" id="productPrice" min="0" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="productCost">Cost Price</label>
-                        <input type="number" id="productCost" min="0" required>
-                    </div>
-
+                <div class="form-group">
+                    <label for="stockReference">Reference / Invoice No.</label>
+                    <input type="text" id="stockReference" placeholder="Optional">
                 </div>
 
-                <div class="form-row">
+                <div class="form-group">
+                    <label for="stockNotes">Notes</label>
+                    <textarea id="stockNotes" placeholder="Optional"></textarea>
+                </div>
 
-                    <div class="form-group">
-                        <label for="productStock">Initial Stock</label>
-                        <input type="number" id="productStock" min="0" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="lowStockLimit">Low Stock Limit</label>
-                        <input type="number" id="lowStockLimit" min="0" value="5">
-                    </div>
-
+                <div class="form-total">
+                    <span>Total Purchase</span>
+                    <strong id="stockTotalAmount">Rs. 0</strong>
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" class="secondary-btn" id="productModalCancel">
+
+                    <button type="button" class="secondary-btn" id="stockModalCancel">
                         Cancel
                     </button>
 
                     <button type="submit" class="primary-btn">
-                        Add Product
+                        Add Stock
                     </button>
+
                 </div>
 
             </form>
 
         </div>
+
     </div>
 
-    <div class="modal" id="orderModal">
+    <div class="modal" id="saleModal">
+
         <div class="modal-content">
 
             <div class="modal-header">
                 <div>
-                    <h2>New Order</h2>
-                    <p>Create a new customer order.</p>
+                    <h2>Record Sale</h2>
+                    <p>Record a Kurtha Surwal sale.</p>
                 </div>
 
-                <button class="modal-close" id="orderModalClose">
+                <button class="modal-close" id="saleModalClose">
                     ×
                 </button>
             </div>
 
-            <form id="orderForm">
+            <form id="saleForm">
 
-                <div class="form-group">
-                    <label for="orderCustomer">Customer</label>
-                    <select id="orderCustomer" required>
-                        <option value="">Select Customer</option>
-                    </select>
-                </div>
+                <div class="form-row">
 
-                <div class="form-group">
-                    <label for="orderProduct">Product</label>
-                    <select id="orderProduct" required>
-                        <option value="">Select Product</option>
-                    </select>
+                    <div class="form-group">
+                        <label for="saleDate">Date</label>
+                        <input type="date" id="saleDate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="saleQuantity">Quantity Sold</label>
+                        <input type="number" id="saleQuantity" min="1" required>
+                    </div>
+
                 </div>
 
                 <div class="form-row">
 
                     <div class="form-group">
-                        <label for="orderQuantity">Quantity</label>
-                        <input type="number" id="orderQuantity" min="1" required>
+                        <label for="sellingPrice">Selling Price Per Piece</label>
+                        <input type="number" id="sellingPrice" min="0" required>
                     </div>
 
                     <div class="form-group">
-                        <label for="orderPayment">Payment Method</label>
-                        <select id="orderPayment" required>
+                        <label for="paymentMethod">Payment Method</label>
+                        <select id="paymentMethod" required>
                             <option value="">Select Payment</option>
                             <option value="cash">Cash</option>
-                            <option value="cod">Cash on Delivery</option>
+                            <option value="online">Online Payment</option>
                             <option value="bank">Bank Transfer</option>
                             <option value="card">Card</option>
-                            <option value="online">Online Payment</option>
                         </select>
                     </div>
 
                 </div>
 
                 <div class="form-group">
-                    <label for="orderStatus">Order Status</label>
-                    <select id="orderStatus" required>
-                        <option value="pending">Pending</option>
-                        <option value="confirmed">Confirmed</option>
-                        <option value="processing">Processing</option>
-                        <option value="shipped">Shipped</option>
-                        <option value="delivered">Delivered</option>
-                    </select>
+                    <label for="saleReference">Reference / Bill No.</label>
+                    <input type="text" id="saleReference" placeholder="Optional">
                 </div>
 
-                <div class="order-total">
-                    <span>Order Total</span>
-                    <strong id="orderTotal">Rs. 0</strong>
+                <div class="form-group">
+                    <label for="saleNotes">Notes</label>
+                    <textarea id="saleNotes" placeholder="Optional"></textarea>
+                </div>
+
+                <div class="sale-summary">
+
+                    <div>
+                        <span>Current Stock</span>
+                        <strong id="saleCurrentStock">0 pieces</strong>
+                    </div>
+
+                    <div>
+                        <span>Total Sale</span>
+                        <strong id="saleTotalAmount">Rs. 0</strong>
+                    </div>
+
+                    <div>
+                        <span>Estimated Profit</span>
+                        <strong id="saleProfitAmount">Rs. 0</strong>
+                    </div>
+
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" class="secondary-btn" id="orderModalCancel">
+
+                    <button type="button" class="secondary-btn" id="saleModalCancel">
                         Cancel
                     </button>
 
                     <button type="submit" class="primary-btn">
-                        Create Order
+                        Record Sale
                     </button>
+
                 </div>
 
             </form>
 
         </div>
+
+    </div>
+
+    <div class="modal" id="adjustmentModal">
+
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <div>
+                    <h2>Stock Adjustment</h2>
+                    <p>Correct the current stock quantity.</p>
+                </div>
+
+                <button class="modal-close" id="adjustmentModalClose">
+                    ×
+                </button>
+            </div>
+
+            <form id="adjustmentForm">
+
+                <div class="form-group">
+                    <label for="adjustmentType">Adjustment Type</label>
+                    <select id="adjustmentType" required>
+                        <option value="">Select Type</option>
+                        <option value="add">Add Stock</option>
+                        <option value="remove">Remove Stock</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="adjustmentQuantity">Quantity</label>
+                    <input type="number" id="adjustmentQuantity" min="1" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="adjustmentReason">Reason</label>
+                    <input type="text" id="adjustmentReason" placeholder="Example: Damaged item" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="adjustmentNotes">Notes</label>
+                    <textarea id="adjustmentNotes" placeholder="Optional"></textarea>
+                </div>
+
+                <div class="modal-actions">
+
+                    <button type="button" class="secondary-btn" id="adjustmentModalCancel">
+                        Cancel
+                    </button>
+
+                    <button type="submit" class="primary-btn">
+                        Save Adjustment
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
     </div>
 
     <script src="script.js"></script>
