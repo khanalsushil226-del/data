@@ -1,0 +1,772 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="navbar">
+        <div class="nav-container">
+
+            <a href="#" class="brand">Tracker</a>
+
+            <nav class="nav-menu">
+                <a href="#dashboard" class="nav-link active">Dashboard</a>
+                <a href="#products" class="nav-link">Products</a>
+                <a href="#orders" class="nav-link">Orders</a>
+                <a href="#sales" class="nav-link">Sales</a>
+                <a href="#customers" class="nav-link">Customers</a>
+                <a href="#reports" class="nav-link">Reports</a>
+                <a href="#settings" class="nav-link">Settings</a>
+            </nav>
+
+            <div class="nav-actions">
+                <button class="notification-btn" id="notificationBtn">
+                    🔔
+                </button>
+
+                <div class="profile" id="profileMenu">
+                    <div class="profile-avatar">A</div>
+                    <div class="profile-info">
+                        <span class="profile-name">Admin</span>
+                        <span class="profile-role">Administrator</span>
+                    </div>
+                </div>
+            </div>
+
+            <button class="menu-toggle" id="menuToggle">
+                ☰
+            </button>
+
+        </div>
+    </header>
+
+    <main>
+
+        <section class="page-section dashboard-section" id="dashboard">
+
+            <div class="page-header">
+                <div>
+                    <p class="page-label">OVERVIEW</p>
+                    <h1>Dashboard</h1>
+                    <p>Manage your clothing store from one place.</p>
+                </div>
+
+                <button class="primary-btn" id="addOrderBtn">
+                    + New Order
+                </button>
+            </div>
+
+            <div class="stats-grid">
+
+                <div class="stat-card">
+                    <div class="stat-icon">💰</div>
+                    <div>
+                        <span>Total Sales</span>
+                        <h2 id="totalSales">Rs. 0</h2>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">📦</div>
+                    <div>
+                        <span>Total Orders</span>
+                        <h2 id="totalOrders">0</h2>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">👕</div>
+                    <div>
+                        <span>Total Products</span>
+                        <h2 id="totalProducts">0</h2>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">⚠️</div>
+                    <div>
+                        <span>Low Stock</span>
+                        <h2 id="lowStock">0</h2>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="dashboard-grid">
+
+                <div class="panel sales-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3>Sales Overview</h3>
+                            <p>Your sales performance</p>
+                        </div>
+
+                        <select id="salesPeriod">
+                            <option value="7">Last 7 Days</option>
+                            <option value="30">Last 30 Days</option>
+                            <option value="90">Last 3 Months</option>
+                            <option value="365">This Year</option>
+                        </select>
+                    </div>
+
+                    <div class="chart-placeholder" id="salesChart">
+                        <span>Sales chart will appear here</span>
+                    </div>
+                </div>
+
+                <div class="panel stock-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3>Stock Status</h3>
+                            <p>Current inventory overview</p>
+                        </div>
+                    </div>
+
+                    <div class="stock-summary">
+                        <div class="stock-item">
+                            <span>In Stock</span>
+                            <strong id="inStock">0</strong>
+                        </div>
+
+                        <div class="stock-item">
+                            <span>Low Stock</span>
+                            <strong id="dashboardLowStock">0</strong>
+                        </div>
+
+                        <div class="stock-item">
+                            <span>Out of Stock</span>
+                            <strong id="outOfStock">0</strong>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="dashboard-grid">
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3>Recent Orders</h3>
+                            <p>Latest customer orders</p>
+                        </div>
+
+                        <a href="#orders" class="view-link">View All</a>
+                    </div>
+
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Customer</th>
+                                    <th>Items</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="recentOrders">
+                                <tr>
+                                    <td colspan="5" class="empty-state">
+                                        No orders yet
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3>Low Stock Products</h3>
+                            <p>Products that need attention</p>
+                        </div>
+
+                        <a href="#products" class="view-link">View All</a>
+                    </div>
+
+                    <div class="low-stock-list" id="lowStockList">
+                        <div class="empty-state">
+                            No low-stock products
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="page-section" id="products">
+
+            <div class="page-header">
+                <div>
+                    <p class="page-label">INVENTORY</p>
+                    <h1>Products</h1>
+                    <p>Manage your clothing products and stock.</p>
+                </div>
+
+                <button class="primary-btn" id="addProductBtn">
+                    + Add Product
+                </button>
+            </div>
+
+            <div class="toolbar">
+                <div class="search-box">
+                    <input type="text" id="productSearch" placeholder="Search products...">
+                </div>
+
+                <select id="categoryFilter">
+                    <option value="all">All Categories</option>
+                    <option value="shirts">Shirts</option>
+                    <option value="tshirts">T-Shirts</option>
+                    <option value="pants">Pants</option>
+                    <option value="jeans">Jeans</option>
+                    <option value="jackets">Jackets</option>
+                    <option value="dresses">Dresses</option>
+                    <option value="other">Other</option>
+                </select>
+
+                <select id="stockFilter">
+                    <option value="all">All Stock</option>
+                    <option value="in-stock">In Stock</option>
+                    <option value="low-stock">Low Stock</option>
+                    <option value="out-of-stock">Out of Stock</option>
+                </select>
+            </div>
+
+            <div class="panel">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Category</th>
+                                <th>Size</th>
+                                <th>Color</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="productTable">
+                            <tr>
+                                <td colspan="8" class="empty-state">
+                                    No products added yet
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <section class="page-section" id="orders">
+
+            <div class="page-header">
+                <div>
+                    <p class="page-label">ORDERS</p>
+                    <h1>Orders</h1>
+                    <p>Track and manage customer orders.</p>
+                </div>
+
+                <button class="primary-btn" id="ordersAddBtn">
+                    + New Order
+                </button>
+            </div>
+
+            <div class="toolbar">
+                <div class="search-box">
+                    <input type="text" id="orderSearch" placeholder="Search orders...">
+                </div>
+
+                <select id="orderStatusFilter">
+                    <option value="all">All Orders</option>
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+
+            <div class="panel">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Customer</th>
+                                <th>Date</th>
+                                <th>Items</th>
+                                <th>Total</th>
+                                <th>Payment</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="orderTable">
+                            <tr>
+                                <td colspan="8" class="empty-state">
+                                    No orders yet
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <section class="page-section" id="sales">
+
+            <div class="page-header">
+                <div>
+                    <p class="page-label">FINANCIAL</p>
+                    <h1>Sales</h1>
+                    <p>Track your store's sales and revenue.</p>
+                </div>
+
+                <select id="salesReportPeriod">
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="year">This Year</option>
+                </select>
+            </div>
+
+            <div class="stats-grid">
+
+                <div class="stat-card">
+                    <div class="stat-icon">💵</div>
+                    <div>
+                        <span>Revenue</span>
+                        <h2 id="salesRevenue">Rs. 0</h2>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🛒</div>
+                    <div>
+                        <span>Orders</span>
+                        <h2 id="salesOrders">0</h2>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">📈</div>
+                    <div>
+                        <span>Average Order</span>
+                        <h2 id="averageOrder">Rs. 0</h2>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">↩️</div>
+                    <div>
+                        <span>Refunds</span>
+                        <h2 id="refunds">Rs. 0</h2>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Sales Transactions</h3>
+                        <p>Detailed sales records</p>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Order ID</th>
+                                <th>Customer</th>
+                                <th>Amount</th>
+                                <th>Payment Method</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="salesTable">
+                            <tr>
+                                <td colspan="5" class="empty-state">
+                                    No sales recorded yet
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <section class="page-section" id="customers">
+
+            <div class="page-header">
+                <div>
+                    <p class="page-label">CUSTOMERS</p>
+                    <h1>Customers</h1>
+                    <p>Manage your customer information.</p>
+                </div>
+
+                <button class="primary-btn" id="addCustomerBtn">
+                    + Add Customer
+                </button>
+            </div>
+
+            <div class="toolbar">
+                <div class="search-box">
+                    <input type="text" id="customerSearch" placeholder="Search customers...">
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>Total Orders</th>
+                                <th>Total Spent</th>
+                                <th>Last Order</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="customerTable">
+                            <tr>
+                                <td colspan="7" class="empty-state">
+                                    No customers added yet
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <section class="page-section" id="reports">
+
+            <div class="page-header">
+                <div>
+                    <p class="page-label">ANALYTICS</p>
+                    <h1>Reports</h1>
+                    <p>Analyze your store performance.</p>
+                </div>
+
+                <button class="secondary-btn" id="exportReportBtn">
+                    Export Report
+                </button>
+            </div>
+
+            <div class="reports-grid">
+
+                <div class="report-card">
+                    <span>Sales Report</span>
+                    <h3>Revenue & Sales</h3>
+                    <p>View detailed sales performance.</p>
+                    <button class="secondary-btn">View Report</button>
+                </div>
+
+                <div class="report-card">
+                    <span>Inventory Report</span>
+                    <h3>Stock Analysis</h3>
+                    <p>Analyze your current inventory.</p>
+                    <button class="secondary-btn">View Report</button>
+                </div>
+
+                <div class="report-card">
+                    <span>Product Report</span>
+                    <h3>Best Sellers</h3>
+                    <p>Find your most popular products.</p>
+                    <button class="secondary-btn">View Report</button>
+                </div>
+
+                <div class="report-card">
+                    <span>Customer Report</span>
+                    <h3>Customer Activity</h3>
+                    <p>Understand customer purchasing behavior.</p>
+                    <button class="secondary-btn">View Report</button>
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="page-section" id="settings">
+
+            <div class="page-header">
+                <div>
+                    <p class="page-label">SYSTEM</p>
+                    <h1>Settings</h1>
+                    <p>Configure your Tracker software.</p>
+                </div>
+            </div>
+
+            <div class="settings-grid">
+
+                <div class="panel settings-panel">
+                    <h3>Store Information</h3>
+
+                    <div class="form-group">
+                        <label for="storeName">Store Name</label>
+                        <input type="text" id="storeName" placeholder="Enter store name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="storePhone">Phone</label>
+                        <input type="text" id="storePhone" placeholder="Enter phone number">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="storeEmail">Email</label>
+                        <input type="email" id="storeEmail" placeholder="Enter email">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="storeAddress">Address</label>
+                        <textarea id="storeAddress" placeholder="Enter store address"></textarea>
+                    </div>
+
+                    <button class="primary-btn" id="saveSettingsBtn">
+                        Save Changes
+                    </button>
+                </div>
+
+                <div class="panel settings-panel">
+                    <h3>System Preferences</h3>
+
+                    <div class="setting-row">
+                        <div>
+                            <strong>Low Stock Alert</strong>
+                            <p>Show alerts when products reach low stock.</p>
+                        </div>
+
+                        <input type="checkbox" id="lowStockAlert" checked>
+                    </div>
+
+                    <div class="setting-row">
+                        <div>
+                            <strong>Order Notifications</strong>
+                            <p>Receive notifications for new orders.</p>
+                        </div>
+
+                        <input type="checkbox" id="orderNotifications" checked>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <div class="modal" id="productModal">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <div>
+                    <h2>Add Product</h2>
+                    <p>Add a new clothing item to your inventory.</p>
+                </div>
+
+                <button class="modal-close" id="productModalClose">
+                    ×
+                </button>
+            </div>
+
+            <form id="productForm">
+
+                <div class="form-row">
+
+                    <div class="form-group">
+                        <label for="productName">Product Name</label>
+                        <input type="text" id="productName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productCategory">Category</label>
+                        <select id="productCategory" required>
+                            <option value="">Select Category</option>
+                            <option value="shirts">Shirts</option>
+                            <option value="tshirts">T-Shirts</option>
+                            <option value="pants">Pants</option>
+                            <option value="jeans">Jeans</option>
+                            <option value="jackets">Jackets</option>
+                            <option value="dresses">Dresses</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                <div class="form-row">
+
+                    <div class="form-group">
+                        <label for="productSize">Size</label>
+                        <select id="productSize">
+                            <option value="">Select Size</option>
+                            <option value="XS">XS</option>
+                            <option value="S">S</option>
+                            <option value="M">M</option>
+                            <option value="L">L</option>
+                            <option value="XL">XL</option>
+                            <option value="XXL">XXL</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productColor">Color</label>
+                        <input type="text" id="productColor">
+                    </div>
+
+                </div>
+
+                <div class="form-row">
+
+                    <div class="form-group">
+                        <label for="productPrice">Selling Price</label>
+                        <input type="number" id="productPrice" min="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productCost">Cost Price</label>
+                        <input type="number" id="productCost" min="0" required>
+                    </div>
+
+                </div>
+
+                <div class="form-row">
+
+                    <div class="form-group">
+                        <label for="productStock">Initial Stock</label>
+                        <input type="number" id="productStock" min="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="lowStockLimit">Low Stock Limit</label>
+                        <input type="number" id="lowStockLimit" min="0" value="5">
+                    </div>
+
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="secondary-btn" id="productModalCancel">
+                        Cancel
+                    </button>
+
+                    <button type="submit" class="primary-btn">
+                        Add Product
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+    <div class="modal" id="orderModal">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <div>
+                    <h2>New Order</h2>
+                    <p>Create a new customer order.</p>
+                </div>
+
+                <button class="modal-close" id="orderModalClose">
+                    ×
+                </button>
+            </div>
+
+            <form id="orderForm">
+
+                <div class="form-group">
+                    <label for="orderCustomer">Customer</label>
+                    <select id="orderCustomer" required>
+                        <option value="">Select Customer</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="orderProduct">Product</label>
+                    <select id="orderProduct" required>
+                        <option value="">Select Product</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+
+                    <div class="form-group">
+                        <label for="orderQuantity">Quantity</label>
+                        <input type="number" id="orderQuantity" min="1" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="orderPayment">Payment Method</label>
+                        <select id="orderPayment" required>
+                            <option value="">Select Payment</option>
+                            <option value="cash">Cash</option>
+                            <option value="cod">Cash on Delivery</option>
+                            <option value="bank">Bank Transfer</option>
+                            <option value="card">Card</option>
+                            <option value="online">Online Payment</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                <div class="form-group">
+                    <label for="orderStatus">Order Status</label>
+                    <select id="orderStatus" required>
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                    </select>
+                </div>
+
+                <div class="order-total">
+                    <span>Order Total</span>
+                    <strong id="orderTotal">Rs. 0</strong>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="secondary-btn" id="orderModalCancel">
+                        Cancel
+                    </button>
+
+                    <button type="submit" class="primary-btn">
+                        Create Order
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
+```
