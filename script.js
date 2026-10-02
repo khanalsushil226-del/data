@@ -247,7 +247,79 @@ function updateDashboard() {
 
     updateLowStockAlert();
     updateRecentActivity();
-    updateSalesChart();
+   function updateSalesChart() {
+    const chart = document.getElementById("salesChart");
+
+    if (!chart) return;
+
+    const today = new Date();
+    const days = [];
+
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+
+        const dateString = `${year}-${month}-${day}`;
+
+        const sales = data.sales
+            .filter(item => item.date === dateString)
+            .reduce(
+                (total, item) => total + Number(item.totalAmount),
+                0
+            );
+
+        days.push({
+            date: dateString,
+            sales
+        });
+    }
+
+    const maxSales = Math.max(
+        ...days.map(item => item.sales),
+        1
+    );
+
+    chart.innerHTML = `
+        <div class="sales-chart">
+            ${days.map(item => {
+                const height = Math.max(
+                    (item.sales / maxSales) * 100,
+                    item.sales > 0 ? 5 : 0
+                );
+
+                const date = new Date(item.date);
+
+                const label = date.toLocaleDateString("en-US", {
+                    weekday: "short"
+                });
+
+                return `
+                    <div class="chart-column">
+                        <div class="chart-value">
+                            ${item.sales > 0 ? formatCurrency(item.sales) : ""}
+                        </div>
+
+                        <div class="chart-bar-area">
+                            <div
+                                class="chart-bar"
+                                style="height: ${height}%"
+                                title="${formatCurrency(item.sales)}"
+                            ></div>
+                        </div>
+
+                        <div class="chart-label">
+                            ${label}
+                        </div>
+                    </div>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
 }
 
 function updateLowStockAlert() {
