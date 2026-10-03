@@ -31,9 +31,15 @@ function loadData() {
         return {
             ...structuredClone(defaultData),
             ...parsed,
-            purchases: Array.isArray(parsed.purchases) ? parsed.purchases : [],
-            sales: Array.isArray(parsed.sales) ? parsed.sales : [],
-            adjustments: Array.isArray(parsed.adjustments) ? parsed.adjustments : [],
+            purchases: Array.isArray(parsed.purchases)
+                ? parsed.purchases
+                : [],
+            sales: Array.isArray(parsed.sales)
+                ? parsed.sales
+                : [],
+            adjustments: Array.isArray(parsed.adjustments)
+                ? parsed.adjustments
+                : [],
             settings: {
                 ...defaultData.settings,
                 ...(parsed.settings || {})
@@ -48,6 +54,7 @@ function loadData() {
 function saveData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
+
 async function loadPurchasesFromBackend() {
     try {
         const response = await fetch(`${API_BASE_URL}/purchases`);
@@ -79,8 +86,41 @@ async function loadPurchasesFromBackend() {
     }
 }
 
+async function loadSalesFromBackend() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/sales`);
+
+        if (!response.ok) {
+            throw new Error("Failed to load sales");
+        }
+
+        const sales = await response.json();
+
+        data.sales = sales.map(item => ({
+            id: item.id,
+            date: item.date,
+            createdAt: Date.parse(item.created_at) || Date.now(),
+            quantity: Number(item.quantity),
+            unitPrice: Number(item.unit_price),
+            totalAmount: Number(item.total_amount),
+            paymentMethod: item.payment_method || "",
+            reference: item.reference || "",
+            notes: item.notes || ""
+        }));
+
+        saveData();
+
+        return true;
+    } catch (error) {
+        console.error("Sales API error:", error);
+        return false;
+    }
+}
+
 function generateId(prefix = "item") {
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    return `${prefix}_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
 }
 
 function formatCurrency(value) {
@@ -100,6 +140,7 @@ function formatNumber(value) {
 
 function getToday() {
     const date = new Date();
+
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -173,7 +214,8 @@ function getAllInventoryEvents() {
 
 function getInventoryState(untilDate = null) {
     let quantity = Number(data.openingStock) || 0;
-    let value = quantity * (Number(data.settings.purchasePrice) || 0);
+    let value =
+        quantity * (Number(data.settings.purchasePrice) || 0);
 
     const events = getAllInventoryEvents();
 
@@ -190,7 +232,10 @@ function getInventoryState(untilDate = null) {
         if (event.type === "sale") {
             if (quantity > 0) {
                 const averageCost = value / quantity;
-                value -= Math.min(event.quantity, quantity) * averageCost;
+
+                value -=
+                    Math.min(event.quantity, quantity) *
+                    averageCost;
             }
 
             quantity -= event.quantity;
@@ -206,9 +251,10 @@ function getInventoryState(untilDate = null) {
 
         if (event.type === "adjustment") {
             if (event.quantity > 0) {
-                const averageCost = quantity > 0
-                    ? value / quantity
-                    : Number(data.settings.purchasePrice) || 0;
+                const averageCost =
+                    quantity > 0
+                        ? value / quantity
+                        : Number(data.settings.purchasePrice) || 0;
 
                 quantity += event.quantity;
                 value += event.quantity * averageCost;
@@ -218,9 +264,10 @@ function getInventoryState(untilDate = null) {
                     quantity
                 );
 
-                const averageCost = quantity > 0
-                    ? value / quantity
-                    : 0;
+                const averageCost =
+                    quantity > 0
+                        ? value / quantity
+                        : 0;
 
                 quantity -= removeQuantity;
                 value -= removeQuantity * averageCost;
@@ -257,36 +304,41 @@ function getAveragePurchasePrice() {
 
 function getTotalPurchase() {
     return data.purchases.reduce(
-        (total, item) => total + (Number(item.totalAmount) || 0),
+        (total, item) =>
+            total + (Number(item.totalAmount) || 0),
         0
     );
 }
 
 function getTotalSales() {
     return data.sales.reduce(
-        (total, item) => total + (Number(item.totalAmount) || 0),
+        (total, item) =>
+            total + (Number(item.totalAmount) || 0),
         0
     );
 }
 
 function getTotalItemsPurchased() {
     return data.purchases.reduce(
-        (total, item) => total + (Number(item.quantity) || 0),
+        (total, item) =>
+            total + (Number(item.quantity) || 0),
         0
     );
 }
 
 function getTotalItemsSold() {
     return data.sales.reduce(
-        (total, item) => total + (Number(item.quantity) || 0),
+        (total, item) =>
+            total + (Number(item.quantity) || 0),
         0
     );
 }
 
 function getSaleCost(saleId) {
     let quantity = Number(data.openingStock) || 0;
-    let value = quantity * (Number(data.settings.purchasePrice) || 0);
-    let saleCost = 0;
+
+    let value =
+        quantity * (Number(data.settings.purchasePrice) || 0);
 
     const events = getAllInventoryEvents();
 
@@ -305,8 +357,9 @@ function getSaleCost(saleId) {
                     return cost;
                 }
 
-                saleCost += cost;
-                value -= Math.min(event.quantity, quantity) * averageCost;
+                value -=
+                    Math.min(event.quantity, quantity) *
+                    averageCost;
             }
 
             quantity -= event.quantity;
@@ -322,9 +375,10 @@ function getSaleCost(saleId) {
 
         if (event.type === "adjustment") {
             if (event.quantity > 0) {
-                const averageCost = quantity > 0
-                    ? value / quantity
-                    : Number(data.settings.purchasePrice) || 0;
+                const averageCost =
+                    quantity > 0
+                        ? value / quantity
+                        : Number(data.settings.purchasePrice) || 0;
 
                 quantity += event.quantity;
                 value += event.quantity * averageCost;
@@ -334,9 +388,10 @@ function getSaleCost(saleId) {
                     quantity
                 );
 
-                const averageCost = quantity > 0
-                    ? value / quantity
-                    : 0;
+                const averageCost =
+                    quantity > 0
+                        ? value / quantity
+                        : 0;
 
                 quantity -= removeQuantity;
                 value -= removeQuantity * averageCost;
@@ -352,7 +407,7 @@ function getSaleCost(saleId) {
         }
     }
 
-    return saleCost;
+    return 0;
 }
 
 function getTotalProfit() {
@@ -370,7 +425,8 @@ function getTodaySales() {
     return data.sales
         .filter(item => isSameDate(item.date, today))
         .reduce(
-            (total, item) => total + (Number(item.totalAmount) || 0),
+            (total, item) =>
+                total + (Number(item.totalAmount) || 0),
             0
         );
 }
@@ -381,7 +437,8 @@ function getTodayPurchase() {
     return data.purchases
         .filter(item => isSameDate(item.date, today))
         .reduce(
-            (total, item) => total + (Number(item.totalAmount) || 0),
+            (total, item) =>
+                total + (Number(item.totalAmount) || 0),
             0
         );
 }
@@ -410,8 +467,11 @@ function initializeDates() {
         }
     });
 
-    const purchaseFromDate = document.getElementById("purchaseFromDate");
-    const purchaseToDate = document.getElementById("purchaseToDate");
+    const purchaseFromDate =
+        document.getElementById("purchaseFromDate");
+
+    const purchaseToDate =
+        document.getElementById("purchaseToDate");
 
     if (purchaseToDate && !purchaseToDate.value) {
         purchaseToDate.value = today;
@@ -420,12 +480,15 @@ function initializeDates() {
     if (purchaseFromDate && !purchaseFromDate.value) {
         const date = new Date();
         date.setDate(date.getDate() - 30);
-
-        purchaseFromDate.value = date.toISOString().split("T")[0];
+        purchaseFromDate.value =
+            date.toISOString().split("T")[0];
     }
 
-    const salesFromDate = document.getElementById("salesFromDate");
-    const salesToDate = document.getElementById("salesToDate");
+    const salesFromDate =
+        document.getElementById("salesFromDate");
+
+    const salesToDate =
+        document.getElementById("salesToDate");
 
     if (salesToDate && !salesToDate.value) {
         salesToDate.value = today;
@@ -434,12 +497,15 @@ function initializeDates() {
     if (salesFromDate && !salesFromDate.value) {
         const date = new Date();
         date.setDate(date.getDate() - 30);
-
-        salesFromDate.value = date.toISOString().split("T")[0];
+        salesFromDate.value =
+            date.toISOString().split("T")[0];
     }
 
-    const reportToDate = document.getElementById("reportToDate");
-    const reportFromDate = document.getElementById("reportFromDate");
+    const reportToDate =
+        document.getElementById("reportToDate");
+
+    const reportFromDate =
+        document.getElementById("reportFromDate");
 
     if (reportToDate && !reportToDate.value) {
         reportToDate.value = today;
@@ -448,24 +514,55 @@ function initializeDates() {
     if (reportFromDate && !reportFromDate.value) {
         const date = new Date();
         date.setDate(date.getDate() - 30);
-
-        reportFromDate.value = date.toISOString().split("T")[0];
+        reportFromDate.value =
+            date.toISOString().split("T")[0];
     }
 }
-
 function updateDashboard() {
     const currentStock = getCurrentStock();
     const totalPurchase = getTotalPurchase();
     const totalSales = getTotalSales();
     const totalProfit = getTotalProfit();
 
-    setText("currentStock", formatNumber(currentStock));
-    setText("totalPurchase", formatCurrency(totalPurchase));
-    setText("totalSales", formatCurrency(totalSales));
-    setText("totalProfit", formatCurrency(totalProfit));
+    setText(
+        "currentDate",
+        new Date().toLocaleDateString("en-IN", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric"
+        })
+    );
 
-    setText("todaySales", formatCurrency(getTodaySales()));
-    setText("todayPurchase", formatCurrency(getTodayPurchase()));
+    setText(
+        "currentStock",
+        formatNumber(currentStock)
+    );
+
+    setText(
+        "totalPurchase",
+        formatCurrency(totalPurchase)
+    );
+
+    setText(
+        "totalSales",
+        formatCurrency(totalSales)
+    );
+
+    setText(
+        "totalProfit",
+        formatCurrency(totalProfit)
+    );
+
+    setText(
+        "todaySales",
+        formatCurrency(getTodaySales())
+    );
+
+    setText(
+        "todayPurchase",
+        formatCurrency(getTodayPurchase())
+    );
 
     setText(
         "totalItemsPurchased",
@@ -477,47 +574,171 @@ function updateDashboard() {
         formatNumber(getTotalItemsSold())
     );
 
-    setText("openingStock", formatNumber(data.openingStock));
+    updateDashboardPeriod();
+    updateSalesChart();
+    updateStockSummary();
+    updateLowStockAlert();
+    renderRecentActivity();
+}
+
+function updateDashboardPeriod() {
+    const period = document.getElementById("dashboardPeriod");
+
+    if (!period) {
+        return;
+    }
+
+    const value = period.value || "all";
+
+    let purchases = [...data.purchases];
+    let sales = [...data.sales];
+
+    const today = new Date();
+
+    if (value === "today") {
+        const date = getToday();
+
+        purchases = purchases.filter(
+            item => item.date === date
+        );
+
+        sales = sales.filter(
+            item => item.date === date
+        );
+    }
+
+    if (value === "week") {
+        const start = new Date(today);
+        start.setDate(today.getDate() - 6);
+
+        const startDate =
+            start.toISOString().split("T")[0];
+
+        purchases = purchases.filter(
+            item => item.date >= startDate
+        );
+
+        sales = sales.filter(
+            item => item.date >= startDate
+        );
+    }
+
+    if (value === "month") {
+        const year = today.getFullYear();
+        const month = String(
+            today.getMonth() + 1
+        ).padStart(2, "0");
+
+        const startDate = `${year}-${month}-01`;
+
+        purchases = purchases.filter(
+            item => item.date >= startDate
+        );
+
+        sales = sales.filter(
+            item => item.date >= startDate
+        );
+    }
+
+    const purchaseTotal = purchases.reduce(
+        (total, item) =>
+            total + (Number(item.totalAmount) || 0),
+        0
+    );
+
+    const salesTotal = sales.reduce(
+        (total, item) =>
+            total + (Number(item.totalAmount) || 0),
+        0
+    );
+
+    const itemsPurchased = purchases.reduce(
+        (total, item) =>
+            total + (Number(item.quantity) || 0),
+        0
+    );
+
+    const itemsSold = sales.reduce(
+        (total, item) =>
+            total + (Number(item.quantity) || 0),
+        0
+    );
+
+    setText(
+        "periodPurchase",
+        formatCurrency(purchaseTotal)
+    );
+
+    setText(
+        "periodSales",
+        formatCurrency(salesTotal)
+    );
+
+    setText(
+        "periodItemsPurchased",
+        formatNumber(itemsPurchased)
+    );
+
+    setText(
+        "periodItemsSold",
+        formatNumber(itemsSold)
+    );
+}
+
+function updateStockSummary() {
+    const openingStock =
+        Number(data.openingStock) || 0;
+
+    const stockIn = getTotalItemsPurchased();
+
+    const stockOut = getTotalItemsSold();
+
+    const currentStock = getCurrentStock();
+
+    setText(
+        "openingStock",
+        formatNumber(openingStock)
+    );
+
     setText(
         "summaryStockIn",
-        formatNumber(getTotalItemsPurchased())
+        formatNumber(stockIn)
     );
+
     setText(
         "summaryStockOut",
-        formatNumber(getTotalItemsSold())
+        formatNumber(stockOut)
     );
+
     setText(
         "summaryCurrentStock",
         formatNumber(currentStock)
     );
-
-    const currentDate = document.getElementById("currentDate");
-
-    if (currentDate) {
-        currentDate.textContent = formatDate(getToday());
-    }
-
-    updateLowStockAlert();
-    updateSalesChart();
-    renderRecentActivity();
 }
 
 function updateLowStockAlert() {
-    const alertBox = document.getElementById("lowStockAlert");
+    const alertBox =
+        document.getElementById("lowStockAlert");
 
     if (!alertBox) {
         return;
     }
 
     const currentStock = getCurrentStock();
-    const limit = Number(data.settings.lowStockLimit) || 0;
+
+    const limit =
+        Number(data.settings.lowStockLimit) || 0;
 
     if (currentStock <= limit) {
         alertBox.classList.remove("hidden");
 
         alertBox.innerHTML = `
             <strong>Low Stock</strong>
-            <span>Current stock is ${formatNumber(currentStock)} pieces. Your low stock limit is ${formatNumber(limit)} pieces.</span>
+            <span>
+                Current stock is ${formatNumber(currentStock)}
+                pieces. Your low stock limit is
+                ${formatNumber(limit)} pieces.
+            </span>
         `;
     } else {
         alertBox.classList.add("hidden");
@@ -530,17 +751,29 @@ function getLastSevenDays() {
 
     for (let i = 6; i >= 0; i--) {
         const date = new Date();
-        date.setDate(date.getDate() - i);
+
+        date.setDate(
+            date.getDate() - i
+        );
 
         const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const day = String(date.getDate()).padStart(2, "0");
+
+        const month = String(
+            date.getMonth() + 1
+        ).padStart(2, "0");
+
+        const day = String(
+            date.getDate()
+        ).padStart(2, "0");
 
         days.push({
             date: `${year}-${month}-${day}`,
-            label: date.toLocaleDateString("en-IN", {
-                weekday: "short"
-            })
+            label: date.toLocaleDateString(
+                "en-IN",
+                {
+                    weekday: "short"
+                }
+            )
         });
     }
 
@@ -548,7 +781,8 @@ function getLastSevenDays() {
 }
 
 function updateSalesChart() {
-    const chart = document.getElementById("salesChart");
+    const chart =
+        document.getElementById("salesChart");
 
     if (!chart) {
         return;
@@ -558,15 +792,19 @@ function updateSalesChart() {
 
     const values = days.map(day => {
         return data.sales
-            .filter(sale => sale.date === day.date)
+            .filter(
+                sale => sale.date === day.date
+            )
             .reduce(
                 (total, sale) =>
-                    total + (Number(sale.totalAmount) || 0),
+                    total +
+                    (Number(sale.totalAmount) || 0),
                 0
             );
     });
 
-    const maxValue = Math.max(...values, 1);
+    const maxValue =
+        Math.max(...values, 1);
 
     chart.innerHTML = `
         <div class="chart-bars">
@@ -578,9 +816,18 @@ function updateSalesChart() {
 
                 return `
                     <div class="chart-column">
-                        <div class="chart-value">${formatCurrency(value)}</div>
-                        <div class="chart-bar" style="height:${height}%"></div>
-                        <div class="chart-label">${days[index].label}</div>
+                        <div class="chart-value">
+                            ${formatCurrency(value)}
+                        </div>
+
+                        <div
+                            class="chart-bar"
+                            style="height:${height}%"
+                        ></div>
+
+                        <div class="chart-label">
+                            ${days[index].label}
+                        </div>
                     </div>
                 `;
             }).join("")}
@@ -596,8 +843,10 @@ function getActivityList() {
             date: item.date,
             createdAt: item.createdAt || 0,
             type: "Stock In",
-            description: `Purchased ${formatNumber(item.quantity)} pieces`,
-            amount: Number(item.totalAmount) || 0
+            description:
+                `Purchased ${formatNumber(item.quantity)} pieces`,
+            amount:
+                Number(item.totalAmount) || 0
         });
     });
 
@@ -606,8 +855,10 @@ function getActivityList() {
             date: item.date,
             createdAt: item.createdAt || 0,
             type: "Sale",
-            description: `Sold ${formatNumber(item.quantity)} pieces`,
-            amount: Number(item.totalAmount) || 0
+            description:
+                `Sold ${formatNumber(item.quantity)} pieces`,
+            amount:
+                Number(item.totalAmount) || 0
         });
     });
 
@@ -616,63 +867,114 @@ function getActivityList() {
             date: item.date,
             createdAt: item.createdAt || 0,
             type: "Adjustment",
-            description: `${item.quantity >= 0 ? "Added" : "Removed"} ${formatNumber(Math.abs(item.quantity))} pieces`,
+            description:
+                `${item.quantity >= 0 ? "Added" : "Removed"} ${formatNumber(Math.abs(item.quantity))} pieces`,
             amount: 0
         });
     });
 
     return activities.sort((a, b) => {
-        const dateCompare = String(b.date).localeCompare(String(a.date));
+        const dateCompare =
+            String(b.date).localeCompare(
+                String(a.date)
+            );
 
         if (dateCompare !== 0) {
             return dateCompare;
         }
 
-        return Number(b.createdAt) - Number(a.createdAt);
+        return (
+            Number(b.createdAt) -
+            Number(a.createdAt)
+        );
     });
 }
 
 function renderRecentActivity() {
-    const container = document.getElementById("recentActivity");
+    const container =
+        document.getElementById("recentActivity");
 
     if (!container) {
         return;
     }
 
-    const activities = getActivityList().slice(0, 8);
+    const activities =
+        getActivityList().slice(0, 8);
 
     if (!activities.length) {
         container.innerHTML = `
             <tr>
-                <td colspan="4">No recent activity</td>
+                <td colspan="4">
+                    No recent activity
+                </td>
             </tr>
         `;
 
         return;
     }
 
-    container.innerHTML = activities.map(activity => `
-        <tr>
-            <td>${formatDate(activity.date)}</td>
-            <td>${activity.type}</td>
-            <td>${activity.description}</td>
-            <td>${activity.amount ? formatCurrency(activity.amount) : "-"}</td>
-        </tr>
-    `).join("");
-}
-function renderStockPage() {
-    const currentStock = getCurrentStock();
-    const stockValue = getStockValue();
-    const averageCost = getAveragePurchasePrice();
-    const sellingPrice = Number(data.settings.sellingPrice) || 0;
-    const potentialProfit = (sellingPrice - averageCost) * currentStock;
+    container.innerHTML =
+        activities.map(activity => `
+            <tr>
+                <td>
+                    ${formatDate(activity.date)}
+                </td>
 
-    setText("stockPageQuantity", formatNumber(currentStock));
-    setText("stockPurchaseValue", formatCurrency(stockValue));
+                <td>
+                    ${activity.type}
+                </td>
+
+                <td>
+                    ${activity.description}
+                </td>
+
+                <td>
+                    ${
+                        activity.amount
+                            ? formatCurrency(
+                                activity.amount
+                            )
+                            : "-"
+                    }
+                </td>
+            </tr>
+        `).join("");
+}
+
+function renderStockPage() {
+    const currentStock =
+        getCurrentStock();
+
+    const stockValue =
+        getStockValue();
+
+    const averageCost =
+        getAveragePurchasePrice();
+
+    const sellingPrice =
+        Number(data.settings.sellingPrice) || 0;
+
+    const potentialProfit =
+        (sellingPrice - averageCost) *
+        currentStock;
+
+    setText(
+        "stockPageQuantity",
+        formatNumber(currentStock)
+    );
+
+    setText(
+        "stockPurchaseValue",
+        formatCurrency(stockValue)
+    );
+
     setText(
         "stockSalesValue",
-        formatCurrency(currentStock * sellingPrice)
+        formatCurrency(
+            currentStock * sellingPrice
+        )
     );
+
     setText(
         "potentialProfit",
         formatCurrency(potentialProfit)
@@ -695,7 +997,9 @@ function renderStockPage() {
 
     setText(
         "detailLowStock",
-        `${formatNumber(data.settings.lowStockLimit)} pieces`
+        `${formatNumber(
+            data.settings.lowStockLimit
+        )} pieces`
     );
 
     setText(
@@ -708,29 +1012,38 @@ function renderStockPage() {
 }
 
 function updateStockStatus() {
-    const status = document.getElementById("stockStatus");
+    const status =
+        document.getElementById("stockStatus");
 
     if (!status) {
         return;
     }
 
     const stock = getCurrentStock();
-    const limit = Number(data.settings.lowStockLimit) || 0;
+
+    const limit =
+        Number(data.settings.lowStockLimit) || 0;
 
     if (stock <= 0) {
         status.textContent = "Out of Stock";
-        status.className = "stock-status danger";
+        status.className =
+            "stock-status danger";
     } else if (stock <= limit) {
         status.textContent = "Low Stock";
-        status.className = "stock-status warning";
+        status.className =
+            "stock-status warning";
     } else {
         status.textContent = "In Stock";
-        status.className = "stock-status success";
+        status.className =
+            "stock-status success";
     }
 }
 
 function renderStockMovements() {
-    const table = document.getElementById("stockMovementTable");
+    const table =
+        document.getElementById(
+            "stockMovementTable"
+        );
 
     if (!table) {
         return;
@@ -743,8 +1056,12 @@ function renderStockMovements() {
             date: item.date,
             createdAt: item.createdAt || 0,
             type: "Stock In",
-            quantity: Number(item.quantity) || 0,
-            reference: item.reference || item.supplier || "-",
+            quantity:
+                Number(item.quantity) || 0,
+            reference:
+                item.reference ||
+                item.supplier ||
+                "-",
             notes: item.notes || "-"
         });
     });
@@ -754,8 +1071,10 @@ function renderStockMovements() {
             date: item.date,
             createdAt: item.createdAt || 0,
             type: "Sale",
-            quantity: -(Number(item.quantity) || 0),
-            reference: item.reference || "-",
+            quantity:
+                -(Number(item.quantity) || 0),
+            reference:
+                item.reference || "-",
             notes: item.notes || "-"
         });
     });
@@ -765,59 +1084,98 @@ function renderStockMovements() {
             date: item.date,
             createdAt: item.createdAt || 0,
             type: "Adjustment",
-            quantity: Number(item.quantity) || 0,
-            reference: item.reason || "-",
-            notes: item.notes || "-"
+            quantity:
+                Number(item.quantity) || 0,
+            reference:
+                item.reason || "-",
+            notes:
+                item.notes || "-"
         });
     });
 
     movements.sort((a, b) => {
-        const dateCompare = String(b.date).localeCompare(String(a.date));
+        const dateCompare =
+            String(b.date).localeCompare(
+                String(a.date)
+            );
 
         if (dateCompare !== 0) {
             return dateCompare;
         }
 
-        return Number(b.createdAt) - Number(a.createdAt);
+        return (
+            Number(b.createdAt) -
+            Number(a.createdAt)
+        );
     });
 
     if (!movements.length) {
         table.innerHTML = `
             <tr>
-                <td colspan="5">No stock movement found</td>
+                <td colspan="5">
+                    No stock movement found
+                </td>
             </tr>
         `;
 
         return;
     }
 
-    table.innerHTML = movements.map(item => `
-        <tr>
-            <td>${formatDate(item.date)}</td>
-            <td>${item.type}</td>
-            <td class="${item.quantity >= 0 ? "text-success" : "text-danger"}">
-                ${item.quantity >= 0 ? "+" : ""}${formatNumber(item.quantity)}
-            </td>
-            <td>${item.reference}</td>
-            <td>${item.notes}</td>
-        </tr>
-    `).join("");
+    table.innerHTML =
+        movements.map(item => `
+            <tr>
+                <td>
+                    ${formatDate(item.date)}
+                </td>
+
+                <td>
+                    ${item.type}
+                </td>
+
+                <td class="${
+                    item.quantity >= 0
+                        ? "text-success"
+                        : "text-danger"
+                }">
+                    ${
+                        item.quantity >= 0
+                            ? "+"
+                            : ""
+                    }${formatNumber(
+                        item.quantity
+                    )}
+                </td>
+
+                <td>
+                    ${item.reference}
+                </td>
+
+                <td>
+                    ${item.notes}
+                </td>
+            </tr>
+        `).join("");
 }
 
 function renderPurchasePage() {
-    const purchases = getFilteredPurchases();
+    const purchases =
+        getFilteredPurchases();
 
-    const totalQuantity = purchases.reduce(
-        (total, item) =>
-            total + (Number(item.quantity) || 0),
-        0
-    );
+    const totalQuantity =
+        purchases.reduce(
+            (total, item) =>
+                total +
+                (Number(item.quantity) || 0),
+            0
+        );
 
-    const totalAmount = purchases.reduce(
-        (total, item) =>
-            total + (Number(item.totalAmount) || 0),
-        0
-    );
+    const totalAmount =
+        purchases.reduce(
+            (total, item) =>
+                total +
+                (Number(item.totalAmount) || 0),
+            0
+        );
 
     setText(
         "stockInQuantity",
@@ -834,18 +1192,28 @@ function renderPurchasePage() {
 
 function getFilteredPurchases() {
     const fromDate =
-        document.getElementById("purchaseFromDate")?.value || "";
+        document.getElementById(
+            "purchaseFromDate"
+        )?.value || "";
 
     const toDate =
-        document.getElementById("purchaseToDate")?.value || "";
+        document.getElementById(
+            "purchaseToDate"
+        )?.value || "";
 
     return data.purchases
         .filter(item => {
-            if (fromDate && item.date < fromDate) {
+            if (
+                fromDate &&
+                item.date < fromDate
+            ) {
                 return false;
             }
 
-            if (toDate && item.date > toDate) {
+            if (
+                toDate &&
+                item.date > toDate
+            ) {
                 return false;
             }
 
@@ -853,18 +1221,26 @@ function getFilteredPurchases() {
         })
         .sort((a, b) => {
             const dateCompare =
-                String(b.date).localeCompare(String(a.date));
+                String(b.date).localeCompare(
+                    String(a.date)
+                );
 
             if (dateCompare !== 0) {
                 return dateCompare;
             }
 
-            return Number(b.createdAt) - Number(a.createdAt);
+            return (
+                Number(b.createdAt) -
+                Number(a.createdAt)
+            );
         });
 }
 
-e(purchases) {
-    const table = document.getElementById("purchaseTable");
+function renderPurchaseTable(purchases) {
+    const table =
+        document.getElementById(
+            "purchaseTable"
+        );
 
     if (!table) {
         return;
@@ -873,62 +1249,112 @@ e(purchases) {
     if (!purchases.length) {
         table.innerHTML = `
             <tr>
-                <td colspan="8">No purchase records found</td>
+                <td colspan="8">
+                    No purchase records found
+                </td>
             </tr>
         `;
 
         return;
     }
 
-    table.innerHTML = purchases.map(item => `
-        <tr>
-            <td>${formatDate(item.date)}</td>
-            <td>${formatNumber(item.quantity)}</td>
-            <td>${formatCurrency(item.unitPrice)}</td>
-            <td>${formatCurrency(item.totalAmount)}</td>
-            <td>${item.supplier || "-"}</td>
-            <td>${item.reference || "-"}</td>
-            <td>${item.notes || "-"}</td>
-            <td>
-                <button
-                    type="button"
-                    class="table-delete-btn"
-                    data-purchase-delete="${item.id}"
-                >
-                    Deletfunction renderPurchaseTable
-                </button>
-            </td>
-        </tr>
-    `).join("");
+    table.innerHTML =
+        purchases.map(item => `
+            <tr>
+                <td>
+                    ${formatDate(item.date)}
+                </td>
 
-    table.querySelectorAll("[data-purchase-delete]").forEach(button => {
-        button.addEventListener("click", () => {
-            deletePurchase(button.dataset.purchaseDelete);
+                <td>
+                    ${formatNumber(item.quantity)}
+                </td>
+
+                <td>
+                    ${formatCurrency(item.unitPrice)}
+                </td>
+
+                <td>
+                    ${formatCurrency(item.totalAmount)}
+                </td>
+
+                <td>
+                    ${item.supplier || "-"}
+                </td>
+
+                <td>
+                    ${item.reference || "-"}
+                </td>
+
+                <td>
+                    ${item.notes || "-"}
+                </td>
+
+                <td>
+                    <button
+                        type="button"
+                        class="table-delete-btn"
+                        data-purchase-delete="${item.id}"
+                    >
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `).join("");
+
+    table
+        .querySelectorAll(
+            "[data-purchase-delete]"
+        )
+        .forEach(button => {
+            button.addEventListener(
+                "click",
+                () => {
+                    deletePurchase(
+                        button.dataset
+                            .purchaseDelete
+                    );
+                }
+            );
         });
-    });
 }
 
 function renderSalesPage() {
-    const sales = getFilteredSales();
+    const sales =
+        getFilteredSales();
 
-    const totalQuantity = sales.reduce(
-        (total, item) =>
-            total + (Number(item.quantity) || 0),
-        0
-    );
+    const totalQuantity =
+        sales.reduce(
+            (total, item) =>
+                total +
+                (Number(item.quantity) || 0),
+            0
+        );
 
-    const totalAmount = sales.reduce(
-        (total, item) =>
-            total + (Number(item.totalAmount) || 0),
-        0
-    );
+    const totalAmount =
+        sales.reduce(
+            (total, item) =>
+                total +
+                (Number(item.totalAmount) || 0),
+            0
+        );
 
-    const totalProfit = sales.reduce((total, item) => {
-        const revenue = Number(item.totalAmount) || 0;
-        const cost = getSaleCost(item.id);
+    const totalProfit =
+        sales.reduce(
+            (total, item) => {
+                const revenue =
+                    Number(item.totalAmount) || 0;
 
-        return total + revenue - cost;
-    }, 0);
+                const cost =
+                    getSaleCost(item.id);
+
+                return (
+                    total +
+                    revenue -
+                    cost
+                );
+            },
+            0
+        );
 
     setText(
         "salesQuantity",
@@ -950,18 +1376,28 @@ function renderSalesPage() {
 
 function getFilteredSales() {
     const fromDate =
-        document.getElementById("salesFromDate")?.value || "";
+        document.getElementById(
+            "salesFromDate"
+        )?.value || "";
 
     const toDate =
-        document.getElementById("salesToDate")?.value || "";
+        document.getElementById(
+            "salesToDate"
+        )?.value || "";
 
     return data.sales
         .filter(item => {
-            if (fromDate && item.date < fromDate) {
+            if (
+                fromDate &&
+                item.date < fromDate
+            ) {
                 return false;
             }
 
-            if (toDate && item.date > toDate) {
+            if (
+                toDate &&
+                item.date > toDate
+            ) {
                 return false;
             }
 
@@ -969,18 +1405,26 @@ function getFilteredSales() {
         })
         .sort((a, b) => {
             const dateCompare =
-                String(b.date).localeCompare(String(a.date));
+                String(b.date).localeCompare(
+                    String(a.date)
+                );
 
             if (dateCompare !== 0) {
                 return dateCompare;
             }
 
-            return Number(b.createdAt) - Number(a.createdAt);
+            return (
+                Number(b.createdAt) -
+                Number(a.createdAt)
+            );
         });
 }
 
 function renderSalesTable(sales) {
-    const table = document.getElementById("salesTable");
+    const table =
+        document.getElementById(
+            "salesTable"
+        );
 
     if (!table) {
         return;
@@ -989,93 +1433,176 @@ function renderSalesTable(sales) {
     if (!sales.length) {
         table.innerHTML = `
             <tr>
-                <td colspan="9">No sales records found</td>
+                <td colspan="9">
+                    No sales records found
+                </td>
             </tr>
         `;
 
         return;
     }
 
-    table.innerHTML = sales.map(item => {
-        const revenue = Number(item.totalAmount) || 0;
-        const cost = getSaleCost(item.id);
-        const profit = revenue - cost;
+    table.innerHTML =
+        sales.map(item => {
+            const revenue =
+                Number(item.totalAmount) || 0;
 
-        return `
-            <tr>
-                <td>${formatDate(item.date)}</td>
-                <td>${formatNumber(item.quantity)}</td>
-                <td>${formatCurrency(item.unitPrice)}</td>
-                <td>${formatCurrency(revenue)}</td>
-                <td>${formatCurrency(cost)}</td>
-                <td>${formatCurrency(profit)}</td>
-                <td>${item.paymentMethod || "-"}</td>
-                <td>${item.reference || "-"}</td>
-                <td>
-                    <button
-                        type="button"
-                        class="table-delete-btn"
-                        data-sale-delete="${item.id}"
-                    >
-                        Delete
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join("");
+            const cost =
+                getSaleCost(item.id);
 
-    table.querySelectorAll("[data-sale-delete]").forEach(button => {
-        button.addEventListener("click", () => {
-            deleteSale(button.dataset.saleDelete);
+            const profit =
+                revenue - cost;
+
+            return `
+                <tr>
+                    <td>
+                        ${formatDate(item.date)}
+                    </td>
+
+                    <td>
+                        ${formatNumber(
+                            item.quantity
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatCurrency(
+                            item.unitPrice
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatCurrency(
+                            revenue
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatCurrency(
+                            cost
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatCurrency(
+                            profit
+                        )}
+                    </td>
+
+                    <td>
+                        ${
+                            item.paymentMethod ||
+                            "-"
+                        }
+                    </td>
+
+                    <td>
+                        ${
+                            item.reference ||
+                            "-"
+                        }
+                    </td>
+
+                    <td>
+                        <button
+                            type="button"
+                            class="table-delete-btn"
+                            data-sale-delete="${item.id}"
+                        >
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+    table
+        .querySelectorAll(
+            "[data-sale-delete]"
+        )
+        .forEach(button => {
+            button.addEventListener(
+                "click",
+                () => {
+                    deleteSale(
+                        button.dataset
+                            .saleDelete
+                    );
+                }
+            );
         });
-    });
 }
 
 function getReportData(fromDate, toDate) {
-    const purchases = data.purchases.filter(item => {
-        return (
-            (!fromDate || item.date >= fromDate) &&
-            (!toDate || item.date <= toDate)
+    const purchases =
+        data.purchases.filter(item => {
+            return (
+                (!fromDate ||
+                    item.date >= fromDate) &&
+                (!toDate ||
+                    item.date <= toDate)
+            );
+        });
+
+    const sales =
+        data.sales.filter(item => {
+            return (
+                (!fromDate ||
+                    item.date >= fromDate) &&
+                (!toDate ||
+                    item.date <= toDate)
+            );
+        });
+
+    const totalPurchase =
+        purchases.reduce(
+            (total, item) =>
+                total +
+                (Number(item.totalAmount) || 0),
+            0
         );
-    });
 
-    const sales = data.sales.filter(item => {
-        return (
-            (!fromDate || item.date >= fromDate) &&
-            (!toDate || item.date <= toDate)
+    const totalSales =
+        sales.reduce(
+            (total, item) =>
+                total +
+                (Number(item.totalAmount) || 0),
+            0
         );
-    });
 
-    const totalPurchase = purchases.reduce(
-        (total, item) =>
-            total + (Number(item.totalAmount) || 0),
-        0
-    );
+    const itemsPurchased =
+        purchases.reduce(
+            (total, item) =>
+                total +
+                (Number(item.quantity) || 0),
+            0
+        );
 
-    const totalSales = sales.reduce(
-        (total, item) =>
-            total + (Number(item.totalAmount) || 0),
-        0
-    );
+    const itemsSold =
+        sales.reduce(
+            (total, item) =>
+                total +
+                (Number(item.quantity) || 0),
+            0
+        );
 
-    const itemsPurchased = purchases.reduce(
-        (total, item) =>
-            total + (Number(item.quantity) || 0),
-        0
-    );
+    const profit =
+        sales.reduce(
+            (total, item) => {
+                const revenue =
+                    Number(item.totalAmount) || 0;
 
-    const itemsSold = sales.reduce(
-        (total, item) =>
-            total + (Number(item.quantity) || 0),
-        0
-    );
+                const cost =
+                    getSaleCost(item.id);
 
-    const profit = sales.reduce((total, item) => {
-        const revenue = Number(item.totalAmount) || 0;
-        const cost = getSaleCost(item.id);
-
-        return total + revenue - cost;
-    }, 0);
+                return (
+                    total +
+                    revenue -
+                    cost
+                );
+            },
+            0
+        );
 
     return {
         purchases,
@@ -1090,49 +1617,73 @@ function getReportData(fromDate, toDate) {
 
 function updateReports() {
     const fromDate =
-        document.getElementById("reportFromDate")?.value || "";
+        document.getElementById(
+            "reportFromDate"
+        )?.value || "";
 
     const toDate =
-        document.getElementById("reportToDate")?.value || "";
+        document.getElementById(
+            "reportToDate"
+        )?.value || "";
 
-    const report = getReportData(fromDate, toDate);
+    const report =
+        getReportData(
+            fromDate,
+            toDate
+        );
 
     setText(
         "reportPurchase",
-        formatCurrency(report.totalPurchase)
+        formatCurrency(
+            report.totalPurchase
+        )
     );
 
     setText(
         "reportSales",
-        formatCurrency(report.totalSales)
+        formatCurrency(
+            report.totalSales
+        )
     );
 
     setText(
         "reportProfit",
-        formatCurrency(report.profit)
+        formatCurrency(
+            report.profit
+        )
     );
 
     setText(
         "reportItemsSold",
-        formatNumber(report.itemsSold)
+        formatNumber(
+            report.itemsSold
+        )
     );
 
     setText(
         "reportItemsPurchased",
-        formatNumber(report.itemsPurchased)
+        formatNumber(
+            report.itemsPurchased
+        )
     );
 
     setText(
         "reportCurrentStock",
-        formatNumber(getCurrentStock())
+        formatNumber(
+            getCurrentStock()
+        )
     );
 
     setText(
         "profitSales",
-        formatCurrency(report.totalSales)
+        formatCurrency(
+            report.totalSales
+        )
     );
 
-    const totalCost = report.totalSales - report.profit;
+    const totalCost =
+        report.totalSales -
+        report.profit;
 
     setText(
         "profitCost",
@@ -1141,39 +1692,63 @@ function updateReports() {
 
     setText(
         "profitTotal",
-        formatCurrency(report.profit)
+        formatCurrency(
+            report.profit
+        )
     );
 
     updateReportChart(report);
 }
 
 function updateReportChart(report) {
-    const chart = document.getElementById("purchaseSalesChart");
+    const chart =
+        document.getElementById(
+            "purchaseSalesChart"
+        );
 
     if (!chart) {
         return;
     }
 
-    const purchase = report.totalPurchase;
-    const sales = report.totalSales;
-    const maxValue = Math.max(purchase, sales, 1);
+    const purchase =
+        report.totalPurchase;
+
+    const sales =
+        report.totalSales;
+
+    const maxValue =
+        Math.max(
+            purchase,
+            sales,
+            1
+        );
 
     const purchaseHeight =
-        Math.max(5, (purchase / maxValue) * 100);
+        Math.max(
+            5,
+            (purchase / maxValue) * 100
+        );
 
     const salesHeight =
-        Math.max(5, (sales / maxValue) * 100);
+        Math.max(
+            5,
+            (sales / maxValue) * 100
+        );
 
     chart.innerHTML = `
         <div class="chart-bars report-chart-bars">
             <div class="chart-column">
                 <div class="chart-value">
-                    ${formatCurrency(purchase)}
+                    ${formatCurrency(
+                        purchase
+                    )}
                 </div>
+
                 <div
                     class="chart-bar"
                     style="height:${purchaseHeight}%"
                 ></div>
+
                 <div class="chart-label">
                     Purchase
                 </div>
@@ -1181,12 +1756,16 @@ function updateReportChart(report) {
 
             <div class="chart-column">
                 <div class="chart-value">
-                    ${formatCurrency(sales)}
+                    ${formatCurrency(
+                        sales
+                    )}
                 </div>
+
                 <div
                     class="chart-bar"
                     style="height:${salesHeight}%"
                 ></div>
+
                 <div class="chart-label">
                     Sales
                 </div>
@@ -1194,189 +1773,20 @@ function updateReportChart(report) {
         </div>
     `;
 }
-
-function loadSettings() {
-    const storeName =
-        document.getElementById("storeName");
-
-    const storePhone =
-        document.getElementById("storePhone");
-
-    const storeAddress =
-        document.getElementById("storeAddress");
-
-    const purchasePrice =
-        document.getElementById("defaultPurchasePrice");
-
-    const sellingPrice =
-        document.getElementById("defaultSellingPrice");
-
-    const lowStockLimit =
-        document.getElementById("lowStockLimit");
-
-    if (storeName) {
-        storeName.value =
-            data.settings.storeName || "";
-    }
-
-    if (storePhone) {
-        storePhone.value =
-            data.settings.phone || "";
-    }
-
-    if (storeAddress) {
-        storeAddress.value =
-            data.settings.address || "";
-    }
-
-    if (purchasePrice) {
-        purchasePrice.value =
-            data.settings.purchasePrice || "";
-    }
-
-    if (sellingPrice) {
-        sellingPrice.value =
-            data.settings.sellingPrice || "";
-    }
-
-    if (lowStockLimit) {
-        lowStockLimit.value =
-            data.settings.lowStockLimit || "";
-    }
-}
-
-function saveStoreSettings() {
-    const storeName =
-        document.getElementById("storeName");
-
-    const storePhone =
-        document.getElementById("storePhone");
-
-    const storeAddress =
-        document.getElementById("storeAddress");
-
-    data.settings.storeName =
-        storeName?.value.trim() || "Tracker";
-
-    data.settings.phone =
-        storePhone?.value.trim() || "";
-
-    data.settings.address =
-        storeAddress?.value.trim() || "";
-
-    saveData();
-
-    alert("Store settings saved successfully.");
-
-    updateAll();
-}
-
-function saveInventorySettingsHandler() {
-    const purchasePrice =
-        document.getElementById("defaultPurchasePrice");
-
-    const sellingPrice =
-        document.getElementById("defaultSellingPrice");
-
-    const lowStockLimit =
-        document.getElementById("lowStockLimit");
-
-    data.settings.purchasePrice =
-        Math.max(0, Number(purchasePrice?.value) || 0);
-
-    data.settings.sellingPrice =
-        Math.max(0, Number(sellingPrice?.value) || 0);
-
-    data.settings.lowStockLimit =
-        Math.max(0, Number(lowStockLimit?.value) || 0);
-
-    saveData();
-
-    alert("Inventory settings saved successfully.");
-
-    updateAll();
-}
-
-function openModal(id) {
-    const modal = document.getElementById(id);
-
-    if (modal) {
-        modal.classList.add("show");
-        modal.classList.remove("hidden");
-    }
-}
-
-function closeModal(id) {
-    const modal = document.getElementById(id);
-
-    if (modal) {
-        modal.classList.remove("show");
-        modal.classList.add("hidden");
-    }
-}
-
-function resetStockForm() {
-    const form = document.getElementById("stockForm");
-
-    if (form) {
-        form.reset();
-    }
-
-    const date = document.getElementById("stockDate");
-
-    if (date) {
-        date.value = getToday();
-    }
-
-    const purchasePrice =
-        document.getElementById("purchasePrice");
-
-    if (purchasePrice) {
-        purchasePrice.value =
-            data.settings.purchasePrice || "";
-    }
-
-    updateStockTotal();
-}
-
-function resetSaleForm() {
-    const form = document.getElementById("saleForm");
-
-    if (form) {
-        form.reset();
-    }
-
-    const date = document.getElementById("saleDate");
-
-    if (date) {
-        date.value = getToday();
-    }
-
-    const sellingPrice =
-        document.getElementById("sellingPrice");
-
-    if (sellingPrice) {
-        sellingPrice.value =
-            data.settings.sellingPrice || "";
-    }
-
-    updateSaleCalculations();
-}
-
-function resetAdjustmentForm() {
-    const form = document.getElementById("adjustmentForm");
-
-    if (form) {
-        form.reset();
-    }
-}
-
 function updateStockTotal() {
     const quantity =
-        Number(document.getElementById("stockQuantity")?.value) || 0;
+        Number(
+            document.getElementById(
+                "stockQuantity"
+            )?.value
+        ) || 0;
 
     const price =
-        Number(document.getElementById("purchasePrice")?.value) || 0;
+        Number(
+            document.getElementById(
+                "purchasePrice"
+            )?.value
+        ) || 0;
 
     const total =
         quantity * price;
@@ -1389,22 +1799,31 @@ function updateStockTotal() {
 
 function updateSaleCalculations() {
     const quantity =
-        Number(document.getElementById("saleQuantity")?.value) || 0;
+        Number(
+            document.getElementById(
+                "saleQuantity"
+            )?.value
+        ) || 0;
 
-    const price =
-        Number(document.getElementById("sellingPrice")?.value) || 0;
+    const sellingPrice =
+        Number(
+            document.getElementById(
+                "sellingPrice"
+            )?.value
+        ) || 0;
 
     const currentStock =
         getCurrentStock();
 
-    const total =
-        quantity * price;
-
     const averageCost =
         getAveragePurchasePrice();
 
+    const totalAmount =
+        quantity * sellingPrice;
+
     const profit =
-        quantity * (price - averageCost);
+        quantity *
+        (sellingPrice - averageCost);
 
     setText(
         "saleCurrentStock",
@@ -1413,7 +1832,7 @@ function updateSaleCalculations() {
 
     setText(
         "saleTotalAmount",
-        formatCurrency(total)
+        formatCurrency(totalAmount)
     );
 
     setText(
@@ -1426,22 +1845,43 @@ async function handleStockSubmit(event) {
     event.preventDefault();
 
     const date =
-        document.getElementById("stockDate")?.value || getToday();
+        document.getElementById(
+            "stockDate"
+        )?.value || getToday();
 
     const quantity =
-        Number(document.getElementById("stockQuantity")?.value) || 0;
+        Number(
+            document.getElementById(
+                "stockQuantity"
+            )?.value
+        ) || 0;
 
     const unitPrice =
-        Number(document.getElementById("purchasePrice")?.value) || 0;
+        Number(
+            document.getElementById(
+                "purchasePrice"
+            )?.value
+        ) || 0;
 
     const supplier =
-        document.getElementById("stockSupplier")?.value.trim() || "";
+        document.getElementById(
+            "stockSupplier"
+        )?.value.trim() || "";
 
     const reference =
-        document.getElementById("stockReference")?.value.trim() || "";
+        document.getElementById(
+            "stockReference"
+        )?.value.trim() || "";
 
     const notes =
-        document.getElementById("stockNotes")?.value.trim() || "";
+        document.getElementById(
+            "stockNotes"
+        )?.value.trim() || "";
+
+    if (!date) {
+        alert("Please select a date.");
+        return;
+    }
 
     if (quantity <= 0) {
         alert("Please enter a valid quantity.");
@@ -1454,59 +1894,93 @@ async function handleStockSubmit(event) {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/purchases`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                date,
-                quantity,
-                unit_price: unitPrice,
-                supplier,
-                reference,
-                notes
-            })
-        });
+        const response =
+            await fetch(
+                `${API_BASE_URL}/purchases`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+                    body: JSON.stringify({
+                        date,
+                        quantity,
+                        unit_price:
+                            unitPrice,
+                        supplier,
+                        reference,
+                        notes
+                    })
+                }
+            );
 
-        const result = await response.json();
+        const result =
+            await response.json();
 
         if (!response.ok) {
-            throw new Error(result.error || "Failed to save purchase");
+            throw new Error(
+                result.error ||
+                "Failed to save purchase"
+            );
         }
 
         await loadPurchasesFromBackend();
 
         closeModal("stockModal");
+
+        resetStockForm();
+
         updateAll();
 
-        alert("Stock added successfully.");
+        alert(
+            "Stock added successfully."
+        );
     } catch (error) {
         console.error(error);
-        alert("Unable to save purchase. Make sure the backend is running.");
+
+        alert(
+            "Unable to save purchase. Make sure the backend is running."
+        );
     }
 }
 
-function handleSaleSubmit(event) {
+async function handleSaleSubmit(event) {
     event.preventDefault();
 
     const date =
-        document.getElementById("saleDate")?.value;
+        document.getElementById(
+            "saleDate"
+        )?.value || getToday();
 
     const quantity =
-        Number(document.getElementById("saleQuantity")?.value);
+        Number(
+            document.getElementById(
+                "saleQuantity"
+            )?.value
+        ) || 0;
 
     const sellingPrice =
-        Number(document.getElementById("sellingPrice")?.value);
+        Number(
+            document.getElementById(
+                "sellingPrice"
+            )?.value
+        ) || 0;
 
     const paymentMethod =
-        document.getElementById("paymentMethod")?.value || "";
+        document.getElementById(
+            "paymentMethod"
+        )?.value || "";
 
     const reference =
-        document.getElementById("saleReference")?.value.trim() || "";
+        document.getElementById(
+            "saleReference"
+        )?.value.trim() || "";
 
     const notes =
-        document.getElementById("saleNotes")?.value.trim() || "";
+        document.getElementById(
+            "saleNotes"
+        )?.value.trim() || "";
 
     const currentStock =
         getCurrentStock();
@@ -1516,7 +1990,7 @@ function handleSaleSubmit(event) {
         return;
     }
 
-    if (!quantity || quantity <= 0) {
+    if (quantity <= 0) {
         alert("Please enter a valid quantity.");
         return;
     }
@@ -1525,69 +1999,96 @@ function handleSaleSubmit(event) {
         alert(
             `You cannot sell ${quantity} pieces. Current stock is ${currentStock} pieces.`
         );
-
         return;
     }
 
-    if (sellingPrice < 0 || Number.isNaN(sellingPrice)) {
+    if (sellingPrice < 0) {
         alert("Please enter a valid selling price.");
         return;
     }
 
-    const totalAmount =
-        quantity * sellingPrice;
+    try {
+        const response =
+            await fetch(
+                `${API_BASE_URL}/sales`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+                    body: JSON.stringify({
+                        date,
+                        quantity,
+                        unit_price:
+                            sellingPrice,
+                        payment_method:
+                            paymentMethod,
+                        reference,
+                        notes
+                    })
+                }
+            );
 
-    const averageCost =
-        getAveragePurchasePrice();
+        const result =
+            await response.json();
 
-    const costAmount =
-        quantity * averageCost;
+        if (!response.ok) {
+            throw new Error(
+                result.error ||
+                "Failed to save sale"
+            );
+        }
 
-    const profit =
-        totalAmount - costAmount;
+        await loadSalesFromBackend();
 
-    data.sales.push({
-        id: generateId("sale"),
-        date,
-        createdAt: Date.now(),
-        quantity,
-        unitPrice: sellingPrice,
-        totalAmount,
-        costAmount,
-        profit,
-        paymentMethod,
-        reference,
-        notes
-    });
+        closeModal("saleModal");
 
-    saveData();
+        resetSaleForm();
 
-    closeModal("saleModal");
-    resetSaleForm();
-    updateAll();
+        updateAll();
 
-    alert("Sale recorded successfully.");
+        alert(
+            "Sale recorded successfully."
+        );
+    } catch (error) {
+        console.error(error);
+
+        alert(
+            error.message ||
+            "Unable to save sale. Make sure the backend is running."
+        );
+    }
 }
 
 function handleAdjustmentSubmit(event) {
     event.preventDefault();
 
+    const date = getToday();
+
     const type =
-        document.getElementById("adjustmentType")?.value || "add";
+        document.getElementById(
+            "adjustmentType"
+        )?.value || "add";
 
     const quantity =
-        Number(document.getElementById("adjustmentQuantity")?.value);
+        Number(
+            document.getElementById(
+                "adjustmentQuantity"
+            )?.value
+        ) || 0;
 
     const reason =
-        document.getElementById("adjustmentReason")?.value.trim() || "";
+        document.getElementById(
+            "adjustmentReason"
+        )?.value.trim() || "";
 
     const notes =
-        document.getElementById("adjustmentNotes")?.value.trim() || "";
+        document.getElementById(
+            "adjustmentNotes"
+        )?.value.trim() || "";
 
-    const currentStock =
-        getCurrentStock();
-
-    if (!quantity || quantity <= 0) {
+    if (quantity <= 0) {
         alert("Please enter a valid quantity.");
         return;
     }
@@ -1599,18 +2100,20 @@ function handleAdjustmentSubmit(event) {
 
     if (
         signedQuantity < 0 &&
-        quantity > currentStock
+        Math.abs(signedQuantity) >
+            getCurrentStock()
     ) {
         alert(
-            `You cannot remove ${quantity} pieces. Current stock is ${currentStock} pieces.`
+            "Adjustment quantity cannot be greater than current stock."
         );
-
         return;
     }
 
     data.adjustments.push({
-        id: generateId("adjustment"),
-        date: getToday(),
+        id: generateId(
+            "adjustment"
+        ),
+        date,
         createdAt: Date.now(),
         quantity: signedQuantity,
         reason,
@@ -1619,502 +2122,868 @@ function handleAdjustmentSubmit(event) {
 
     saveData();
 
-    closeModal("adjustmentModal");
+    closeModal(
+        "adjustmentModal"
+    );
+
     resetAdjustmentForm();
+
     updateAll();
 
-    alert("Stock adjustment saved successfully.");
+    alert(
+        "Stock adjustment saved successfully."
+    );
 }
-function deletePurchase(id) {
-    const purchase = data.purchases.find(
-        item => item.id === id
-    );
 
-    if (!purchase) {
-        return;
-    }
-
-    const confirmed = confirm(
-        "Are you sure you want to delete this purchase record?"
-    );
+async function deletePurchase(id) {
+    const confirmed =
+        confirm(
+            "Are you sure you want to delete this purchase?"
+        );
 
     if (!confirmed) {
         return;
     }
 
-    data.purchases = data.purchases.filter(
-        item => item.id !== id
-    );
+    try {
+        const response =
+            await fetch(
+                `${API_BASE_URL}/purchases/${id}`,
+                {
+                    method: "DELETE"
+                }
+            );
 
-    saveData();
-    updateAll();
+        const result =
+            await response.json();
 
-    alert("Purchase record deleted.");
+        if (!response.ok) {
+            throw new Error(
+                result.error ||
+                "Failed to delete purchase"
+            );
+        }
+
+        await loadPurchasesFromBackend();
+
+        updateAll();
+
+        alert(
+            "Purchase deleted successfully."
+        );
+    } catch (error) {
+        console.error(error);
+
+        alert(
+            error.message ||
+            "Unable to delete purchase."
+        );
+    }
 }
 
-function deleteSale(id) {
-    const sale = data.sales.find(
-        item => item.id === id
-    );
-
-    if (!sale) {
-        return;
-    }
-
-    const confirmed = confirm(
-        "Are you sure you want to delete this sale record?"
-    );
+async function deleteSale(id) {
+    const confirmed =
+        confirm(
+            "Are you sure you want to delete this sale?"
+        );
 
     if (!confirmed) {
         return;
     }
 
-    data.sales = data.sales.filter(
-        item => item.id !== id
-    );
+    try {
+        const response =
+            await fetch(
+                `${API_BASE_URL}/sales/${id}`,
+                {
+                    method: "DELETE"
+                }
+            );
+
+        const result =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                result.error ||
+                "Failed to delete sale"
+            );
+        }
+
+        await loadSalesFromBackend();
+
+        updateAll();
+
+        alert(
+            "Sale deleted successfully."
+        );
+    } catch (error) {
+        console.error(error);
+
+        alert(
+            error.message ||
+            "Unable to delete sale."
+        );
+    }
+}
+
+function openModal(id) {
+    const modal =
+        document.getElementById(id);
+
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.add("show");
+
+    modal.style.display = "flex";
+}
+
+function closeModal(id) {
+    const modal =
+        document.getElementById(id);
+
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.remove("show");
+
+    modal.style.display = "none";
+}
+
+function resetStockForm() {
+    const form =
+        document.getElementById(
+            "stockForm"
+        );
+
+    if (form) {
+        form.reset();
+    }
+
+    const stockDate =
+        document.getElementById(
+            "stockDate"
+        );
+
+    if (stockDate) {
+        stockDate.value = getToday();
+    }
+
+    updateStockTotal();
+}
+
+function resetSaleForm() {
+    const form =
+        document.getElementById(
+            "saleForm"
+        );
+
+    if (form) {
+        form.reset();
+    }
+
+    const saleDate =
+        document.getElementById(
+            "saleDate"
+        );
+
+    if (saleDate) {
+        saleDate.value = getToday();
+    }
+
+    updateSaleCalculations();
+}
+
+function resetAdjustmentForm() {
+    const form =
+        document.getElementById(
+            "adjustmentForm"
+        );
+
+    if (form) {
+        form.reset();
+    }
+}
+
+function loadSettingsIntoForm() {
+    const storeName =
+        document.getElementById(
+            "storeName"
+        );
+
+    const storePhone =
+        document.getElementById(
+            "storePhone"
+        );
+
+    const storeAddress =
+        document.getElementById(
+            "storeAddress"
+        );
+
+    const defaultPurchasePrice =
+        document.getElementById(
+            "defaultPurchasePrice"
+        );
+
+    const defaultSellingPrice =
+        document.getElementById(
+            "defaultSellingPrice"
+        );
+
+    const lowStockLimit =
+        document.getElementById(
+            "lowStockLimit"
+        );
+
+    if (storeName) {
+        storeName.value =
+            data.settings.storeName;
+    }
+
+    if (storePhone) {
+        storePhone.value =
+            data.settings.phone;
+    }
+
+    if (storeAddress) {
+        storeAddress.value =
+            data.settings.address;
+    }
+
+    if (defaultPurchasePrice) {
+        defaultPurchasePrice.value =
+            data.settings.purchasePrice;
+    }
+
+    if (defaultSellingPrice) {
+        defaultSellingPrice.value =
+            data.settings.sellingPrice;
+    }
+
+    if (lowStockLimit) {
+        lowStockLimit.value =
+            data.settings.lowStockLimit;
+    }
+}
+
+function saveGeneralSettings() {
+    const storeName =
+        document.getElementById(
+            "storeName"
+        )?.value.trim() || "Tracker";
+
+    const phone =
+        document.getElementById(
+            "storePhone"
+        )?.value.trim() || "";
+
+    const address =
+        document.getElementById(
+            "storeAddress"
+        )?.value.trim() || "";
+
+    data.settings.storeName =
+        storeName;
+
+    data.settings.phone =
+        phone;
+
+    data.settings.address =
+        address;
 
     saveData();
+
     updateAll();
 
-    alert("Sale record deleted.");
+    alert(
+        "Store settings saved successfully."
+    );
+}
+
+function saveInventorySettings() {
+    const purchasePrice =
+        Number(
+            document.getElementById(
+                "defaultPurchasePrice"
+            )?.value
+        ) || 0;
+
+    const sellingPrice =
+        Number(
+            document.getElementById(
+                "defaultSellingPrice"
+            )?.value
+        ) || 0;
+
+    const lowStockLimit =
+        Number(
+            document.getElementById(
+                "lowStockLimit"
+            )?.value
+        ) || 0;
+
+    if (purchasePrice < 0) {
+        alert(
+            "Purchase price cannot be negative."
+        );
+        return;
+    }
+
+    if (sellingPrice < 0) {
+        alert(
+            "Selling price cannot be negative."
+        );
+        return;
+    }
+
+    if (lowStockLimit < 0) {
+        alert(
+            "Low stock limit cannot be negative."
+        );
+        return;
+    }
+
+    data.settings.purchasePrice =
+        purchasePrice;
+
+    data.settings.sellingPrice =
+        sellingPrice;
+
+    data.settings.lowStockLimit =
+        lowStockLimit;
+
+    saveData();
+
+    updateAll();
+
+    alert(
+        "Inventory settings saved successfully."
+    );
+}
+
+function setDefaultPurchasePrice() {
+    const field =
+        document.getElementById(
+            "purchasePrice"
+        );
+
+    if (
+        field &&
+        !field.value &&
+        Number(data.settings.purchasePrice) > 0
+    ) {
+        field.value =
+            data.settings.purchasePrice;
+    }
+
+    updateStockTotal();
+}
+
+function setDefaultSellingPrice() {
+    const field =
+        document.getElementById(
+            "sellingPrice"
+        );
+
+    if (
+        field &&
+        !field.value &&
+        Number(data.settings.sellingPrice) > 0
+    ) {
+        field.value =
+            data.settings.sellingPrice;
+    }
+
+    updateSaleCalculations();
 }
 
 function setupModalEvents() {
-    const stockModal = document.getElementById("stockModal");
-    const saleModal = document.getElementById("saleModal");
-    const adjustmentModal =
-        document.getElementById("adjustmentModal");
-
     const stockModalClose =
-        document.getElementById("stockModalClose");
+        document.getElementById(
+            "stockModalClose"
+        );
 
     const stockModalCancel =
-        document.getElementById("stockModalCancel");
+        document.getElementById(
+            "stockModalCancel"
+        );
 
     const saleModalClose =
-        document.getElementById("saleModalClose");
+        document.getElementById(
+            "saleModalClose"
+        );
 
     const saleModalCancel =
-        document.getElementById("saleModalCancel");
+        document.getElementById(
+            "saleModalCancel"
+        );
 
     const adjustmentModalClose =
-        document.getElementById("adjustmentModalClose");
+        document.getElementById(
+            "adjustmentModalClose"
+        );
 
     const adjustmentModalCancel =
-        document.getElementById("adjustmentModalCancel");
+        document.getElementById(
+            "adjustmentModalCancel"
+        );
 
-    const addStockBtn =
-        document.getElementById("addStockBtn");
+    stockModalClose?.addEventListener(
+        "click",
+        () => closeModal("stockModal")
+    );
 
-    const addSaleBtn =
-        document.getElementById("addSaleBtn");
+    stockModalCancel?.addEventListener(
+        "click",
+        () => closeModal("stockModal")
+    );
 
-    const stockAdjustmentBtn =
-        document.getElementById("stockAdjustmentBtn");
+    saleModalClose?.addEventListener(
+        "click",
+        () => closeModal("saleModal")
+    );
 
-    if (addStockBtn) {
-        addStockBtn.addEventListener("click", () => {
-            resetStockForm();
-            openModal("stockModal");
-        });
-    }
+    saleModalCancel?.addEventListener(
+        "click",
+        () => closeModal("saleModal")
+    );
 
-    if (addSaleBtn) {
-        addSaleBtn.addEventListener("click", () => {
-            resetSaleForm();
-            openModal("saleModal");
-        });
-    }
+    adjustmentModalClose?.addEventListener(
+        "click",
+        () =>
+            closeModal(
+                "adjustmentModal"
+            )
+    );
 
-    if (stockAdjustmentBtn) {
-        stockAdjustmentBtn.addEventListener("click", () => {
-            resetAdjustmentForm();
-            openModal("adjustmentModal");
-        });
-    }
+    adjustmentModalCancel?.addEventListener(
+        "click",
+        () =>
+            closeModal(
+                "adjustmentModal"
+            )
+    );
 
-    if (stockModalClose) {
-        stockModalClose.addEventListener("click", () => {
-            closeModal("stockModal");
-        });
-    }
-
-    if (stockModalCancel) {
-        stockModalCancel.addEventListener("click", () => {
-            closeModal("stockModal");
-        });
-    }
-
-    if (saleModalClose) {
-        saleModalClose.addEventListener("click", () => {
-            closeModal("saleModal");
-        });
-    }
-
-    if (saleModalCancel) {
-        saleModalCancel.addEventListener("click", () => {
-            closeModal("saleModal");
-        });
-    }
-
-    if (adjustmentModalClose) {
-        adjustmentModalClose.addEventListener("click", () => {
-            closeModal("adjustmentModal");
-        });
-    }
-
-    if (adjustmentModalCancel) {
-        adjustmentModalCancel.addEventListener("click", () => {
-            closeModal("adjustmentModal");
-        });
-    }
-
-    [stockModal, saleModal, adjustmentModal].forEach(modal => {
-        if (!modal) {
-            return;
-        }
-
-        modal.addEventListener("click", event => {
-            if (event.target === modal) {
-                modal.classList.remove("show");
-                modal.classList.add("hidden");
+    document
+        .getElementById("addStockBtn")
+        ?.addEventListener(
+            "click",
+            () => {
+                resetStockForm();
+                setDefaultPurchasePrice();
+                openModal("stockModal");
             }
-        });
-    });
+        );
 
-    const stockForm =
-        document.getElementById("stockForm");
+    document
+        .getElementById("addSaleBtn")
+        ?.addEventListener(
+            "click",
+            () => {
+                resetSaleForm();
+                setDefaultSellingPrice();
+                updateSaleCalculations();
+                openModal("saleModal");
+            }
+        );
 
-    const saleForm =
-        document.getElementById("saleForm");
+    document
+        .getElementById(
+            "stockAdjustmentBtn"
+        )
+        ?.addEventListener(
+            "click",
+            () => {
+                resetAdjustmentForm();
+                openModal(
+                    "adjustmentModal"
+                );
+            }
+        );
 
-    const adjustmentForm =
-        document.getElementById("adjustmentForm");
-
-    if (stockForm) {
-        stockForm.addEventListener(
+    document
+        .getElementById("stockForm")
+        ?.addEventListener(
             "submit",
             handleStockSubmit
         );
-    }
 
-    if (saleForm) {
-        saleForm.addEventListener(
+    document
+        .getElementById("saleForm")
+        ?.addEventListener(
             "submit",
             handleSaleSubmit
         );
-    }
 
-    if (adjustmentForm) {
-        adjustmentForm.addEventListener(
+    document
+        .getElementById(
+            "adjustmentForm"
+        )
+        ?.addEventListener(
             "submit",
             handleAdjustmentSubmit
         );
-    }
 
-    const stockQuantity =
-        document.getElementById("stockQuantity");
-
-    const purchasePrice =
-        document.getElementById("purchasePrice");
-
-    const saleQuantity =
-        document.getElementById("saleQuantity");
-
-    const sellingPrice =
-        document.getElementById("sellingPrice");
-
-    if (stockQuantity) {
-        stockQuantity.addEventListener(
+    document
+        .getElementById("stockQuantity")
+        ?.addEventListener(
             "input",
             updateStockTotal
         );
-    }
 
-    if (purchasePrice) {
-        purchasePrice.addEventListener(
+    document
+        .getElementById("purchasePrice")
+        ?.addEventListener(
             "input",
             updateStockTotal
         );
-    }
 
-    if (saleQuantity) {
-        saleQuantity.addEventListener(
+    document
+        .getElementById("saleQuantity")
+        ?.addEventListener(
             "input",
             updateSaleCalculations
         );
-    }
 
-    if (sellingPrice) {
-        sellingPrice.addEventListener(
+    document
+        .getElementById("sellingPrice")
+        ?.addEventListener(
             "input",
             updateSaleCalculations
         );
-    }
 }
 
 function setupFilters() {
     const purchaseFromDate =
-        document.getElementById("purchaseFromDate");
+        document.getElementById(
+            "purchaseFromDate"
+        );
 
     const purchaseToDate =
-        document.getElementById("purchaseToDate");
+        document.getElementById(
+            "purchaseToDate"
+        );
 
     const salesFromDate =
-        document.getElementById("salesFromDate");
+        document.getElementById(
+            "salesFromDate"
+        );
 
     const salesToDate =
-        document.getElementById("salesToDate");
+        document.getElementById(
+            "salesToDate"
+        );
 
     const reportFromDate =
-        document.getElementById("reportFromDate");
+        document.getElementById(
+            "reportFromDate"
+        );
 
     const reportToDate =
-        document.getElementById("reportToDate");
-
-    [
-        purchaseFromDate,
-        purchaseToDate
-    ].forEach(field => {
-        if (field) {
-            field.addEventListener(
-                "change",
-                renderPurchasePage
-            );
-        }
-    });
-
-    [
-        salesFromDate,
-        salesToDate
-    ].forEach(field => {
-        if (field) {
-            field.addEventListener(
-                "change",
-                renderSalesPage
-            );
-        }
-    });
-
-    [
-        reportFromDate,
-        reportToDate
-    ].forEach(field => {
-        if (field) {
-            field.addEventListener(
-                "change",
-                updateReports
-            );
-        }
-    });
-
-    const generateReportBtn =
-        document.getElementById("generateReportBtn");
-
-    if (generateReportBtn) {
-        generateReportBtn.addEventListener(
-            "click",
-            updateReports
+        document.getElementById(
+            "reportToDate"
         );
-    }
+
+    purchaseFromDate?.addEventListener(
+        "change",
+        renderPurchasePage
+    );
+
+    purchaseToDate?.addEventListener(
+        "change",
+        renderPurchasePage
+    );
+
+    salesFromDate?.addEventListener(
+        "change",
+        renderSalesPage
+    );
+
+    salesToDate?.addEventListener(
+        "change",
+        renderSalesPage
+    );
+
+    reportFromDate?.addEventListener(
+        "change",
+        updateReports
+    );
+
+    reportToDate?.addEventListener(
+        "change",
+        updateReports
+    );
+
+    document
+        .getElementById(
+            "dashboardPeriod"
+        )
+        ?.addEventListener(
+            "change",
+            () => {
+                updateDashboardPeriod();
+                updateSalesChart();
+            }
+        );
 }
 
 function setupSettings() {
-    const saveSettingsBtn =
-        document.getElementById("saveSettingsBtn");
-
-    const saveInventorySettings =
-        document.getElementById("saveInventorySettings");
-
-    if (saveSettingsBtn) {
-        saveSettingsBtn.addEventListener(
+    document
+        .getElementById(
+            "saveSettingsBtn"
+        )
+        ?.addEventListener(
             "click",
-            saveStoreSettings
+            saveGeneralSettings
         );
-    }
 
-    if (saveInventorySettings) {
-        saveInventorySettings.addEventListener(
+    document
+        .getElementById(
+            "saveInventorySettings"
+        )
+        ?.addEventListener(
             "click",
-            saveInventorySettingsHandler
+            saveInventorySettings
         );
-    }
 }
 
 function setupNavbar() {
-    const menuToggle =
-        document.getElementById("menuToggle");
+    const menuButton =
+        document.getElementById(
+            "menuButton"
+        );
 
-    const navMenu =
-        document.getElementById("navMenu");
+    const nav =
+        document.querySelector(
+            ".navbar-nav"
+        );
 
-    if (menuToggle && navMenu) {
-        menuToggle.addEventListener("click", () => {
-            navMenu.classList.toggle("show");
-
-            const expanded =
-                navMenu.classList.contains("show");
-
-            menuToggle.setAttribute(
-                "aria-expanded",
-                expanded ? "true" : "false"
-            );
-        });
-    }
-
-    document.querySelectorAll(".nav-link").forEach(link => {
-        link.addEventListener("click", () => {
-            document
-                .querySelectorAll(".nav-link")
-                .forEach(item => {
-                    item.classList.remove("active");
-                });
-
-            link.classList.add("active");
-
-            if (navMenu) {
-                navMenu.classList.remove("show");
-            }
-
-            if (menuToggle) {
-                menuToggle.setAttribute(
-                    "aria-expanded",
-                    "false"
-                );
-            }
-        });
-    });
-}
-
-function setupReportExport() {
-    const exportButton =
-        document.getElementById("exportReportBtn");
-
-    if (!exportButton) {
+    if (!menuButton || !nav) {
         return;
     }
 
-    exportButton.addEventListener("click", () => {
-        const fromDate =
-            document.getElementById("reportFromDate")?.value || "";
+    menuButton.addEventListener(
+        "click",
+        () => {
+            nav.classList.toggle(
+                "show"
+            );
 
-        const toDate =
-            document.getElementById("reportToDate")?.value || "";
+            menuButton.classList.toggle(
+                "active"
+            );
+        }
+    );
 
-        const report =
-            getReportData(fromDate, toDate);
+    nav
+        .querySelectorAll("a")
+        .forEach(link => {
+            link.addEventListener(
+                "click",
+                () => {
+                    nav.classList.remove(
+                        "show"
+                    );
 
-        const rows = [
-            [
-                "Tracker Report",
-                "",
-                "",
-                ""
-            ],
-            [
-                "From",
-                fromDate || "-",
-                "To",
+                    menuButton.classList.remove(
+                        "active"
+                    );
+                }
+            );
+        });
+}
+
+function setupReportExport() {
+    const button =
+        document.getElementById(
+            "exportReportBtn"
+        );
+
+    if (!button) {
+        return;
+    }
+
+    button.addEventListener(
+        "click",
+        exportReport
+    );
+}
+
+function exportReport() {
+    const fromDate =
+        document.getElementById(
+            "reportFromDate"
+        )?.value || "";
+
+    const toDate =
+        document.getElementById(
+            "reportToDate"
+        )?.value || "";
+
+    const report =
+        getReportData(
+            fromDate,
+            toDate
+        );
+
+    const rows = [
+        [
+            "Tracker Report"
+        ],
+        [
+            `From: ${
+                fromDate || "-"
+            }`
+        ],
+        [
+            `To: ${
                 toDate || "-"
-            ],
-            [],
-            [
-                "Metric",
-                "Value"
-            ],
-            [
-                "Total Purchase",
-                report.totalPurchase
-            ],
-            [
-                "Total Sales",
-                report.totalSales
-            ],
-            [
-                "Total Profit",
-                report.profit
-            ],
-            [
-                "Items Purchased",
-                report.itemsPurchased
-            ],
-            [
-                "Items Sold",
-                report.itemsSold
-            ],
-            [
-                "Current Stock",
-                getCurrentStock()
-            ]
-        ];
+            }`
+        ],
+        [],
+        [
+            "Metric",
+            "Value"
+        ],
+        [
+            "Total Purchase",
+            report.totalPurchase
+        ],
+        [
+            "Total Sales",
+            report.totalSales
+        ],
+        [
+            "Total Profit",
+            report.profit
+        ],
+        [
+            "Items Purchased",
+            report.itemsPurchased
+        ],
+        [
+            "Items Sold",
+            report.itemsSold
+        ],
+        [
+            "Current Stock",
+            getCurrentStock()
+        ]
+    ];
 
-        const csv = rows
-            .map(row =>
-                row.map(value => {
-                    const text = String(value ?? "");
+    const csv =
+        rows.map(row =>
+            row.map(value => {
+                const text =
+                    String(
+                        value ?? ""
+                    );
 
-                    return `"${text.replace(/"/g, '""')}"`
-                }).join(",")
-            )
-            .join("\n");
+                return `"${text.replace(
+                    /"/g,
+                    '""'
+                )}"`;
+            }).join(",")
+        ).join("\n");
 
-        const blob = new Blob(
+    const blob =
+        new Blob(
             [csv],
             {
-                type: "text/csv;charset=utf-8;"
+                type:
+                    "text/csv;charset=utf-8;"
             }
         );
 
-        const url =
-            URL.createObjectURL(blob);
+    const url =
+        URL.createObjectURL(blob);
 
-        const link =
-            document.createElement("a");
+    const link =
+        document.createElement("a");
 
-        link.href = url;
-        link.download =
-            `tracker-report-${getToday()}.csv`;
+    link.href = url;
 
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+    link.download =
+        `tracker-report-${getToday()}.csv`;
 
-        URL.revokeObjectURL(url);
-    });
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    URL.revokeObjectURL(url);
 }
 
 function setupNavigation() {
     const links =
-        document.querySelectorAll(".nav-link");
+        document.querySelectorAll(
+            "[data-section]"
+        );
 
     links.forEach(link => {
-        link.addEventListener("click", event => {
-            const target =
-                link.getAttribute("href");
+        link.addEventListener(
+            "click",
+            () => {
+                links.forEach(item => {
+                    item.classList.remove(
+                        "active"
+                    );
+                });
 
-            if (!target || target === "#") {
-                event.preventDefault();
+                link.classList.add(
+                    "active"
+                );
             }
-        });
+        );
     });
 }
 
 function updateAll() {
     updateDashboard();
+
     renderStockPage();
+
     renderPurchasePage();
+
     renderSalesPage();
+
     updateReports();
-    loadSettings();
+
+    loadSettingsIntoForm();
+
+    updateStockTotal();
+
+    updateSaleCalculations();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+async function initializeApp() {
     initializeDates();
+
     setupModalEvents();
+
     setupFilters();
+
     setupSettings();
+
     setupNavbar();
+
     setupReportExport();
+
     setupNavigation();
+
+    await loadPurchasesFromBackend();
+
+    await loadSalesFromBackend();
+
     updateAll();
-});
+}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    initializeApp
+);
