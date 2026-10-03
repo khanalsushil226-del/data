@@ -3,10 +3,10 @@ const cors = require("cors");
 
 require("./database");
 
-const purchasesRoutes = require("./routes/purchases");
-const salesRoutes = require("./routes/sales");
-const stockRoutes = require("./routes/stock");
-const reportsRoutes = require("./routes/reports");
+const purchasesRoutes = require("./purchases");
+const salesRoutes = require("./sales");
+const stockRoutes = require("./stock");
+const reportsRoutes = require("./reports");
 
 const app = express();
 
