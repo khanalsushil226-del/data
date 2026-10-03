@@ -1,4 +1,5 @@
 const STORAGE_KEY = "trackerData";
+const API_BASE_URL = "http://localhost:5000/api";
 
 const defaultData = {
     openingStock: 0,
@@ -46,6 +47,36 @@ function loadData() {
 
 function saveData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+async function loadPurchasesFromBackend() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/purchases`);
+
+        if (!response.ok) {
+            throw new Error("Failed to load purchases");
+        }
+
+        const purchases = await response.json();
+
+        data.purchases = purchases.map(item => ({
+            id: item.id,
+            date: item.date,
+            createdAt: Date.parse(item.created_at) || Date.now(),
+            quantity: Number(item.quantity),
+            unitPrice: Number(item.unit_price),
+            totalAmount: Number(item.total_amount),
+            supplier: item.supplier || "",
+            reference: item.reference || "",
+            notes: item.notes || ""
+        }));
+
+        saveData();
+
+        return true;
+    } catch (error) {
+        console.error("Purchase API error:", error);
+        return false;
+    }
 }
 
 function generateId(prefix = "item") {
@@ -832,7 +863,7 @@ function getFilteredPurchases() {
         });
 }
 
-function renderPurchaseTable(purchases) {
+e(purchases) {
     const table = document.getElementById("purchaseTable");
 
     if (!table) {
@@ -864,7 +895,7 @@ function renderPurchaseTable(purchases) {
                     class="table-delete-btn"
                     data-purchase-delete="${item.id}"
                 >
-                    Delete
+                    Deletfunction renderPurchaseTable
                 </button>
             </td>
         </tr>
@@ -1391,17 +1422,17 @@ function updateSaleCalculations() {
     );
 }
 
-function handleStockSubmit(event) {
+async function handleStockSubmit(event) {
     event.preventDefault();
 
     const date =
-        document.getElementById("stockDate")?.value;
+        document.getElementById("stockDate")?.value || getToday();
 
     const quantity =
-        Number(document.getElementById("stockQuantity")?.value);
+        Number(document.getElementById("stockQuantity")?.value) || 0;
 
-    const purchasePrice =
-        Number(document.getElementById("purchasePrice")?.value);
+    const unitPrice =
+        Number(document.getElementById("purchasePrice")?.value) || 0;
 
     const supplier =
         document.getElementById("stockSupplier")?.value.trim() || "";
@@ -1412,43 +1443,48 @@ function handleStockSubmit(event) {
     const notes =
         document.getElementById("stockNotes")?.value.trim() || "";
 
-    if (!date) {
-        alert("Please select a date.");
-        return;
-    }
-
-    if (!quantity || quantity <= 0) {
+    if (quantity <= 0) {
         alert("Please enter a valid quantity.");
         return;
     }
 
-    if (purchasePrice < 0 || Number.isNaN(purchasePrice)) {
+    if (unitPrice < 0) {
         alert("Please enter a valid purchase price.");
         return;
     }
 
-    const totalAmount =
-        quantity * purchasePrice;
+    try {
+        const response = await fetch(`${API_BASE_URL}/purchases`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                date,
+                quantity,
+                unit_price: unitPrice,
+                supplier,
+                reference,
+                notes
+            })
+        });
 
-    data.purchases.push({
-        id: generateId("purchase"),
-        date,
-        createdAt: Date.now(),
-        quantity,
-        unitPrice: purchasePrice,
-        totalAmount,
-        supplier,
-        reference,
-        notes
-    });
+        const result = await response.json();
 
-    saveData();
+        if (!response.ok) {
+            throw new Error(result.error || "Failed to save purchase");
+        }
 
-    closeModal("stockModal");
-    resetStockForm();
-    updateAll();
+        await loadPurchasesFromBackend();
 
-    alert("Stock added successfully.");
+        closeModal("stockModal");
+        updateAll();
+
+        alert("Stock added successfully.");
+    } catch (error) {
+        console.error(error);
+        alert("Unable to save purchase. Make sure the backend is running.");
+    }
 }
 
 function handleSaleSubmit(event) {
